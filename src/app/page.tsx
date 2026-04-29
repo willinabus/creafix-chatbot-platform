@@ -318,7 +318,7 @@ export default function DashboardPage() {
               <StatCard label="Taux de conversion" value="42%" />
             </div>
             {usage && <UsageCard usage={usage} />}
-            <PreviewSection />
+            <PreviewSection config={config} />
           </div>
         );
       case "branding":

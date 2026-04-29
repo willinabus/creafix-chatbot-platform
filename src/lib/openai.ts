@@ -17,7 +17,12 @@ export function isOpenAIConfigured(): boolean {
 }
 
 function isReasoningModel(model: string): boolean {
-  return model.includes("o1") || model.includes("o3") || model.startsWith("o-");
+  return (
+    model.includes("o1") ||
+    model.includes("o3") ||
+    model.startsWith("o-") ||
+    model.includes("gpt-5")
+  );
 }
 
 export const OPENAI_CONFIG = {
@@ -30,6 +35,7 @@ export interface ChatCompletionOptions {
   messages: OpenAI.Chat.ChatCompletionMessageParam[];
   tools?: OpenAI.Chat.ChatCompletionTool[];
   temperature?: number;
+  model?: string;
 }
 
 export async function createChatCompletion(options: ChatCompletionOptions) {
@@ -37,10 +43,11 @@ export async function createChatCompletion(options: ChatCompletionOptions) {
     throw new Error("OPENAI_API_KEY is not configured");
   }
 
-  const useReasoning = isReasoningModel(OPENAI_CONFIG.model);
+  const model = options.model || OPENAI_CONFIG.model;
+  const useReasoning = isReasoningModel(model);
 
   const body: any = {
-    model: OPENAI_CONFIG.model,
+    model,
     messages: options.messages,
   };
 
@@ -63,7 +70,7 @@ export async function createChatCompletion(options: ChatCompletionOptions) {
   const usage = completion.usage;
   if (usage) {
     console.log(
-      `[OpenAI] Model: ${OPENAI_CONFIG.model}, Input: ${usage.prompt_tokens}, Output: ${usage.completion_tokens}, Total: ${usage.total_tokens}`
+      `[OpenAI] Model: ${model}, Input: ${usage.prompt_tokens}, Output: ${usage.completion_tokens}, Total: ${usage.total_tokens}`
     );
   }
 

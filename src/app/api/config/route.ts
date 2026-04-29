@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { DEFAULT_SYSTEM_PROMPT } from "@/features/chatbot/config/chatbotConfig";
 
 function flattenConfig(apiConfig: any) {
   return {
@@ -99,7 +100,7 @@ function unflattenConfig(dbConfig: any) {
       address: dbConfig.address,
       contact: dbConfig.contact,
     },
-    systemPrompt: dbConfig.systemPrompt,
+    systemPrompt: dbConfig.systemPrompt || DEFAULT_SYSTEM_PROMPT,
     docs: dbConfig.docs ? JSON.parse(dbConfig.docs) : [],
     calendarProvider: dbConfig.calendarProvider,
     calendarConfig: dbConfig.calendarConfig ? JSON.parse(dbConfig.calendarConfig) : {},

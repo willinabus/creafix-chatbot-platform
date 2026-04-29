@@ -129,10 +129,22 @@ RÈGLES :
 - Le chatbot doit orienter vers la prise de rendez-vous ou la réservation.
 - Réponds UNIQUEMENT avec le JSON, sans markdown, sans explication.`;
 
-    const completion = await createChatCompletion({
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.7,
-    });
+    let completion;
+    try {
+      completion = await createChatCompletion({
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.7,
+        model: "gpt-5-nano-2025-08-07",
+      });
+    } catch (modelError) {
+      // Fallback if gpt-5-nano is not available
+      console.warn("[Scrape] gpt-5-nano unavailable, falling back to gpt-4.1-nano:", modelError);
+      completion = await createChatCompletion({
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.7,
+        model: "gpt-4.1-nano-2025-04-14",
+      });
+    }
 
     const raw = completion.choices[0].message.content || "";
     const jsonMatch = raw.match(/\{[\s\S]*\}/);

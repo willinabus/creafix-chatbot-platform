@@ -12,7 +12,7 @@ import { useChat } from "@/features/chatbot/hooks/useChat";
 import { ChatHeader } from "./ChatHeader";
 import { ChatMessage } from "./ChatMessage";
 import { ChatInput } from "./ChatInput";
-import { QuickReply } from "@/features/chatbot/types";
+import { QuickReply, ChatbotConfig } from "@/features/chatbot/types";
 import { defaultChatbotConfig } from "@/features/chatbot/config/chatbotConfig";
 
 interface ChatWidgetProps {
@@ -20,17 +20,34 @@ interface ChatWidgetProps {
   onToggle?: () => void;
   embedded?: boolean;
   botId?: string;
+  config?: ChatbotConfig;
 }
 
-export function ChatWidget({ isOpen: controlledOpen, onToggle, embedded = false, botId }: ChatWidgetProps) {
+export function ChatWidget({ isOpen: controlledOpen, onToggle, embedded = false, botId, config: propConfig }: ChatWidgetProps) {
   const [internalOpen, setInternalOpen] = useState(false);
+  const [dynamicConfig, setDynamicConfig] = useState<ChatbotConfig | null>(null);
   const isOpen = controlledOpen ?? internalOpen;
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const { messages, isLoading, sendMessage, sendQuickReply, resetConversation } = useChat({ botId });
 
-  const config = defaultChatbotConfig;
+  const config = propConfig || dynamicConfig || defaultChatbotConfig;
+
+  // Load config from DB when botId is provided but no propConfig
+  useEffect(() => {
+    if (propConfig || !botId) return;
+    fetch(`/api/config?botId=${botId}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.success) {
+          setDynamicConfig(data.data);
+        }
+      })
+      .catch(() => {
+        // keep default
+      });
+  }, [botId, propConfig]);
 
   const handleToggle = () => {
     if (onToggle) {

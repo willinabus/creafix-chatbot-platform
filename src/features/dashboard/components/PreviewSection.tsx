@@ -8,8 +8,13 @@
 import { useState } from "react";
 import { Smartphone, Monitor, Tablet } from "lucide-react";
 import { ChatWidget } from "@/features/chatbot/components/ChatWidget";
+import { ChatbotConfig } from "@/features/chatbot/types";
 
-export function PreviewSection() {
+interface PreviewSectionProps {
+  config?: ChatbotConfig;
+}
+
+export function PreviewSection({ config }: PreviewSectionProps) {
   const [device, setDevice] = useState<"desktop" | "tablet" | "mobile">("desktop");
 
   const deviceSizes = {
@@ -76,7 +81,7 @@ export function PreviewSection() {
             background: "#FCFBF8",
           }}
         >
-          <ChatWidget isOpen={true} embedded={true} />
+          <ChatWidget isOpen={true} embedded={true} config={config} />
         </div>
       </div>
 

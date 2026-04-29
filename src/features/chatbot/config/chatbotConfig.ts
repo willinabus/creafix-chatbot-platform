@@ -253,6 +253,9 @@ export async function createDefaultChatbot(name: string, companyName: string) {
         name,
         companyName,
         status: "draft",
+        systemPrompt: DEFAULT_SYSTEM_PROMPT,
+        welcomeMessage: `Bonjour et bienvenue chez ${companyName}, je suis ${name}.\n\nQue souhaitez-vous faire aujourd'hui ?`,
+        inputPlaceholder: "Écrivez votre message...",
       },
     });
   } catch (error) {
