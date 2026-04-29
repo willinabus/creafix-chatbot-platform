@@ -1,36 +1,99 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# CreaFix Chatbot Platform
 
-## Getting Started
+Plateforme de chatbots IA avec prise de rendez-vous automatique, intégration Google Calendar et tableau de bord admin.
 
-First, run the development server:
+## Stack technique
+
+- **Framework** : Next.js 16 + TypeScript
+- **Base de données** : PostgreSQL (Prisma ORM)
+- **IA** : OpenAI GPT-4o-mini avec tool calling
+- **Hébergement** : Vercel
+- **Calendrier** : Google Calendar API (OAuth 2.0)
+
+## Fonctionnalités
+
+- Chatbot widget embarquable sur n'importe quel site
+- Prise de rendez-vous automatisée avec tool calling
+- Vérification des disponibilités en temps réel (Google Calendar)
+- Tableau de bord de configuration (branding, contenu, style)
+- Suivi de consommation IA (quota mensuel)
+- Duplication de chatbots pour nouveaux clients
+
+## Déploiement sur Vercel
+
+### Étape 1 : Créer une base de données PostgreSQL
+
+1. Dans le dashboard Vercel de ton projet → **Storage** → **Create Database**
+2. Choisis **Vercel Postgres** (gratuit)
+3. Une fois créée, copie la **Connection String** (format `postgres://...`)
+
+### Étape 2 : Configurer les variables d'environnement
+
+Dans le dashboard Vercel → **Settings** → **Environment Variables**, ajoute :
+
+| Variable | Description |
+|---|---|
+| `DATABASE_URL` | Connection String PostgreSQL |
+| `OPENAI_API_KEY` | Ta clé API OpenAI (commence par `sk-...`) |
+| `GOOGLE_CLIENT_ID` | Client ID de ton app Google Cloud Console |
+| `GOOGLE_CLIENT_SECRET` | Client Secret de ton app Google Cloud Console |
+| `GOOGLE_REDIRECT_URI` | `https://TON-PROJET.vercel.app/api/auth/google-calendar/callback` |
+| `NEXT_PUBLIC_APP_URL` | L'URL de ton projet Vercel (ex: `https://mon-projet.vercel.app`) |
+
+**⚠️ Important** : Remplace `TON-PROJET` par le vrai nom de domaine Vercel.
+
+### Étape 3 : Déployer
+
+Vercel déploie automatiquement à chaque push sur `main`.
+
+### Étape 4 : Migrer la base de données
+
+Dans le terminal Vercel (ou en local avec la base connectée) :
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npx prisma migrate deploy
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Étape 5 : Configurer Google Calendar (optionnel pour démo)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. Va sur [Google Cloud Console](https://console.cloud.google.com/)
+2. Crée un projet → APIs & Services → Credentials → OAuth 2.0 Client ID
+3. Autorise l'URL de callback : `https://TON-PROJET.vercel.app/api/auth/google-calendar/callback`
+4. Copie le Client ID et Client Secret dans les variables Vercel
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Utilisation du chatbot embed
 
-## Learn More
+Intègre le chatbot sur n'importe quel site avec ce script :
 
-To learn more about Next.js, take a look at the following resources:
+```html
+<script src="https://TON-PROJET.vercel.app/embed.js?botId=clarissa-v1"></script>
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Développement local
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npm install
+npm run dev
+```
 
-## Deploy on Vercel
+Crée un fichier `.env.local` à la racine (voir `.env.example` pour le format).
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Structure du projet
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```
+├── prisma/               # Schéma de base de données (Prisma)
+├── public/               # Fichiers statiques (embed.js)
+├── src/
+│   ├── app/             # Routes API et pages Next.js
+│   │   ├── api/         # API routes (chat, config, auth, etc.)
+│   │   └── widget-preview/  # Widget embarquable
+│   ├── features/
+│   │   ├── chatbot/     # Logique du chatbot (engine, hooks, UI)
+│   │   └── dashboard/   # Composants du tableau de bord
+│   ├── lib/             # Utilitaires (OpenAI, Prisma, usage)
+│   └── config/          # Configuration globale
+```
+
+## Licence
+
+Propriétaire — CreaFix
