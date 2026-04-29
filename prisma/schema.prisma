@@ -1,0 +1,110 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model ChatbotConfig {
+  id          String   @id @default(cuid())
+  name        String   @default("Clarissa")
+  companyName String   @default("La Coiffure Clarissa")
+  tagline     String?
+  logoUrl     String?
+  avatarUrl   String?
+  welcomeMessage String @default("Bonjour, je suis Clarissa. Comment puis-je vous aider ?")
+  inputPlaceholder String @default("Écrivez votre message...")
+  
+  // Branding colors
+  primaryColor     String @default("#a0886d")
+  secondaryColor   String @default("#F5F3EE")
+  accentColor      String @default("#a0886d")
+  widgetBgColor    String @default("#FCFBF8")
+  textColor        String @default("#111111")
+  userBubbleColor  String @default("#0c0b09")
+  botBubbleColor   String @default("#F5F3EE")
+  buttonColor      String @default("#a0886d")
+  borderColor      String @default("rgba(17,17,17,0.10)")
+  headerColor      String @default("#FCFBF8")
+  iconColor        String @default("#a0886d")
+  
+  // Style
+  borderRadius     String @default("6px")
+  buttonRadius     String @default("4px")
+  shadow           String @default("0 1px 3px rgba(0,0,0,0.08)")
+  widgetWidth      String @default("420px")
+  maxHeight        String @default("680px")
+  widgetPosition   String @default("right")
+  padding          String @default("16px")
+  fontFamily       String @default("serif")
+  fontSize         String @default("15px")
+  fabStyle         String @default("default")
+  
+  // Content / Behavior
+  quickReplies     String? // JSON array
+  faq              String? // JSON array
+  services         String? // JSON array
+  tone             String @default("calme, raffinée, professionnelle")
+  humanFallbackCta String @default("Parler à un humain")
+  hours            String @default("Mar-Ven 9h-18h, Sam 9h-16h")
+  address          String @default("Rue de Lausanne 25, 1201 Genève")
+  contact          String @default("022 732 00 00 / bonjour@coiffure-clarissa.ch")
+  
+  // System prompt
+  systemPrompt     String?
+  
+  // Company docs
+  docs             String? // JSON array of {name, content}
+  
+  // Calendar integration
+  calendarProvider String @default("mock")
+  calendarConfig   String? // JSON
+  
+  // Embed
+  embedEnabled     Boolean @default(false)
+  allowedDomains   String? // JSON array
+  
+  // Usage / Billing
+  plan             String   @default("starter") // starter, pro, enterprise
+  monthlyQuota     Int      @default(1500)
+  status           String   @default("active") // active, paused, suspended
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Conversation {
+  id        String   @id @default(cuid())
+  sessionId String
+  messages  String   // JSON array of messages
+  metadata  String?  // JSON
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Appointment {
+  id        String   @id @default(cuid())
+  name      String
+  email     String?
+  phone     String?
+  service   String
+  date      DateTime
+  status    String   @default("pending")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model UsageRecord {
+  id           String   @id @default(cuid())
+  botId        String
+  month        String   // Format: "2026-04"
+  responses    Int      @default(0)
+  inputTokens  Int      @default(0)
+  outputTokens Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  @@unique([botId, month])
+}

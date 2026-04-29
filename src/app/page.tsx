@@ -1,65 +1,541 @@
-import Image from "next/image";
+/**
+ * Main Dashboard Page
+ * Central admin interface with bot selection
+ */
 
-export default function Home() {
-  return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+"use client";
+
+import { useState, useEffect } from "react";
+import { Save, RotateCcw, ChevronLeft } from "lucide-react";
+import { UsageStatus } from "@/lib/usage";
+import { DashboardNav } from "@/features/dashboard/components/DashboardNav";
+import { BrandingSection } from "@/features/dashboard/components/BrandingSection";
+import { StyleSection } from "@/features/dashboard/components/StyleSection";
+import { ContentSection } from "@/features/dashboard/components/ContentSection";
+import { SystemPromptSection } from "@/features/dashboard/components/SystemPromptSection";
+import { DocSection } from "@/features/dashboard/components/DocSection";
+import { CalendarSection } from "@/features/dashboard/components/CalendarSection";
+import { EmbedSection } from "@/features/dashboard/components/EmbedSection";
+import { PreviewSection } from "@/features/dashboard/components/PreviewSection";
+import { BotSelector } from "@/features/dashboard/components/BotSelector";
+import { defaultChatbotConfig } from "@/features/chatbot/config/chatbotConfig";
+
+export default function DashboardPage() {
+  const [view, setView] = useState<"list" | "edit">("list");
+  const [selectedBotId, setSelectedBotId] = useState<string | null>(null);
+  const [activeSection, setActiveSection] = useState("overview");
+  const [config, setConfig] = useState(defaultChatbotConfig);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState("");
+  const [usage, setUsage] = useState<UsageStatus | null>(null);
+
+  // Demo bots list (will come from DB in V2)
+  interface Bot {
+    id: string;
+    name: string;
+    companyName: string;
+    status: "active" | "draft";
+    createdAt: string;
+  }
+
+  const [bots, setBots] = useState<Bot[]>([
+    {
+      id: "clarissa-v1",
+      name: "Clarissa",
+      companyName: "La Coiffure Clarissa",
+      status: "active",
+      createdAt: "2026-04-28",
+    },
+  ]);
+
+  // Load saved config on mount
+  useEffect(() => {
+    fetch("/api/config")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.success) {
+          setConfig((prev) => ({ ...prev, ...data.data }));
+        }
+      })
+      .catch(() => {
+        // keep defaults
+      });
+  }, []);
+
+  // Load usage data
+  useEffect(() => {
+    if (view === "edit" && selectedBotId) {
+      fetch(`/api/usage?botId=${selectedBotId}`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.success) {
+            setUsage(data.data);
+          }
+        })
+        .catch(() => {
+          setUsage(null);
+        });
+    }
+  }, [view, selectedBotId]);
+
+  const handleSelectBot = (botId: string) => {
+    setSelectedBotId(botId);
+    setView("edit");
+    setActiveSection("overview");
+  };
+
+  const handleBackToList = () => {
+    setView("list");
+    setSelectedBotId(null);
+  };
+
+  const handleDuplicateBot = (botId: string) => {
+    const original = bots.find((b) => b.id === botId);
+    if (!original) return;
+
+    const newBot = {
+      id: `${botId}-copy-${Date.now()}`,
+      name: `${original.name} (copie)`,
+      companyName: `${original.companyName} (copie)`,
+      status: "draft" as const,
+      createdAt: new Date().toISOString().split("T")[0],
+    };
+
+    setBots((prev) => [...prev, newBot]);
+    setSaveMessage(`Chatbot "${newBot.name}" dupliqué`);
+    setTimeout(() => setSaveMessage(""), 3000);
+  };
+
+  const handleCreateBot = () => {
+    const newBot = {
+      id: `bot-${Date.now()}`,
+      name: "Nouveau chatbot",
+      companyName: "Mon entreprise",
+      status: "draft" as const,
+      createdAt: new Date().toISOString().split("T")[0],
+    };
+    setBots((prev) => [...prev, newBot]);
+    handleSelectBot(newBot.id);
+  };
+
+  const updateBranding = (values: Partial<typeof config.branding>) => {
+    setConfig((prev) => ({
+      ...prev,
+      branding: { ...prev.branding, ...values },
+    }));
+  };
+
+  const updateStyle = (values: Partial<typeof config.style>) => {
+    setConfig((prev) => ({
+      ...prev,
+      style: { ...prev.style, ...values },
+    }));
+  };
+
+  const updateContent = (values: Partial<typeof config.content>) => {
+    setConfig((prev) => ({
+      ...prev,
+      content: { ...prev.content, ...values },
+    }));
+  };
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    setSaveMessage("");
+    try {
+      const response = await fetch("/api/config", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(config),
+      });
+      if (response.ok) {
+        setSaveMessage("Configuration sauvegardée");
+        setTimeout(() => setSaveMessage(""), 3000);
+      } else {
+        setSaveMessage("Erreur lors de la sauvegarde");
+      }
+    } catch {
+      setSaveMessage("Erreur réseau");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleReset = async () => {
+    try {
+      await fetch("/api/config", { method: "POST" });
+      setConfig(defaultChatbotConfig);
+      setSaveMessage("Configuration réinitialisée");
+      setTimeout(() => setSaveMessage(""), 3000);
+    } catch {
+      setSaveMessage("Erreur lors de la réinitialisation");
+    }
+  };
+
+  const renderSection = () => {
+    switch (activeSection) {
+      case "overview":
+        return (
+          <div className="space-y-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <StatCard label="Conversations" value="12" />
+              <StatCard label="Rendez-vous" value="5" />
+              <StatCard label="Taux de conversion" value="42%" />
+            </div>
+            {usage && <UsageCard usage={usage} />}
+            <PreviewSection />
+          </div>
+        );
+      case "branding":
+        return <BrandingSection config={config.branding} onChange={updateBranding} />;
+      case "style":
+        return <StyleSection style={config.style} onChange={updateStyle} />;
+      case "content":
+        return <ContentSection content={config.content} onChange={updateContent} />;
+      case "docs":
+        return <DocSection docs={config.docs} onChange={(docs) => setConfig((p) => ({ ...p, docs }))} />;
+      case "prompt":
+        return (
+          <SystemPromptSection
+            prompt={config.systemPrompt}
+            onChange={(prompt) => setConfig((p) => ({ ...p, systemPrompt: prompt }))}
+          />
+        );
+      case "calendar":
+        return (
+          <CalendarSection
+            provider={config.calendarProvider}
+            botId={config.id}
+            onChange={(provider) => setConfig((p) => ({ ...p, calendarProvider: provider }))}
+          />
+        );
+      case "embed":
+        return (
+          <EmbedSection
+            botId={config.id}
+            enabled={config.embedEnabled}
+            onChange={(enabled) => setConfig((p) => ({ ...p, embedEnabled: enabled }))}
+          />
+        );
+      default:
+        return <PreviewSection />;
+    }
+  };
+
+  // LIST VIEW
+  if (view === "list") {
+    return (
+      <div className="flex min-h-screen">
+        <nav className="w-64 border-r border-[#E0E0E0] bg-white min-h-screen sticky top-0">
+          <div className="p-6 border-b border-[#E0E0E0]">
+            <div className="flex items-center gap-3">
+              <img
+                src="https://www.creafix.ch/wp-content/uploads/2024/02/cropped-logo-creafix-favicon-fond-noir-32x32.png"
+                alt="CreaFix"
+                className="w-6 h-6"
+              />
+              <span
+                style={{
+                  fontFamily: "'Space Mono', monospace",
+                  fontSize: "14px",
+                  fontWeight: 700,
+                  letterSpacing: "0.02em",
+                }}
+              >
+                CreaFix
+              </span>
+            </div>
+            <p
+              style={{
+                fontFamily: "'Space Mono', monospace",
+                fontSize: "11px",
+                color: "rgba(0,0,0,0.42)",
+                marginTop: "4px",
+                textTransform: "uppercase",
+                letterSpacing: "0.06em",
+              }}
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+              Chatbot Platform
+            </p>
+          </div>
+          <div className="p-4">
+            <div
+              style={{
+                fontFamily: "'Space Mono', monospace",
+                fontSize: "11px",
+                color: "rgba(0,0,0,0.42)",
+              }}
             >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+              v1.0.0
+            </div>
+          </div>
+        </nav>
+
+        <main className="flex-1 min-w-0">
+          <div className="sticky top-0 z-10 flex items-center justify-between px-8 py-4 border-b border-[#E0E0E0] bg-white">
+            <div>
+              <h1
+                style={{
+                  fontFamily: "'Space Mono', monospace",
+                  fontSize: "20px",
+                  fontWeight: 700,
+                }}
+              >
+                Dashboard
+              </h1>
+            </div>
+          </div>
+          <div className="px-8 py-8 max-w-5xl">
+            <BotSelector
+              bots={bots}
+              onSelectBot={handleSelectBot}
+              onDuplicateBot={handleDuplicateBot}
+              onCreateBot={handleCreateBot}
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // EDIT VIEW
+  return (
+    <div className="flex min-h-screen">
+      <DashboardNav activeSection={activeSection} onSectionChange={setActiveSection} />
+
+      <main className="flex-1 min-w-0">
+        {/* Top bar */}
+        <div className="sticky top-0 z-10 flex items-center justify-between px-8 py-4 border-b border-[#E0E0E0] bg-white">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={handleBackToList}
+              className="flex items-center gap-1 px-2 py-1 border border-[#E0E0E0] hover:border-black transition-colors"
+              style={{
+                fontFamily: "'Space Mono', monospace",
+                fontSize: "12px",
+                borderRadius: "2px",
+                background: "white",
+              }}
+            >
+              <ChevronLeft size={14} />
+              Retour
+            </button>
+            <div>
+              <h1
+                style={{
+                  fontFamily: "'Space Mono', monospace",
+                  fontSize: "20px",
+                  fontWeight: 700,
+                }}
+              >
+                {activeSection === "overview" && "Tableau de bord"}
+                {activeSection === "branding" && "Branding"}
+                {activeSection === "style" && "Style & CSS"}
+                {activeSection === "content" && "Contenu"}
+                {activeSection === "docs" && "Documentation"}
+                {activeSection === "prompt" && "Prompt Système"}
+                {activeSection === "calendar" && "Calendrier"}
+                {activeSection === "embed" && "Intégration"}
+              </h1>
+              <p
+                style={{
+                  fontFamily: "'Space Mono', monospace",
+                  fontSize: "12px",
+                  color: "rgba(0,0,0,0.42)",
+                  marginTop: "2px",
+                }}
+              >
+                {config.branding.name} · {config.branding.companyName}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {saveMessage && (
+              <span
+                style={{
+                  fontFamily: "'Space Mono', monospace",
+                  fontSize: "12px",
+                  color: saveMessage.includes("Erreur") ? "#ef4444" : "#22C55E",
+                }}
+              >
+                {saveMessage}
+              </span>
+            )}
+            <button
+              onClick={handleReset}
+              className="flex items-center gap-2 px-4 py-2 border border-[#E0E0E0] hover:border-black transition-colors"
+              style={{
+                fontFamily: "'Space Mono', monospace",
+                fontSize: "13px",
+                borderRadius: "2px",
+                background: "white",
+              }}
+            >
+              <RotateCcw size={14} />
+              Réinitialiser
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={isSaving}
+              className="flex items-center gap-2 px-4 py-2 transition-colors"
+              style={{
+                fontFamily: "'Space Mono', monospace",
+                fontSize: "13px",
+                borderRadius: "2px",
+                background: "#3898EC",
+                color: "white",
+                border: "1px solid #3898EC",
+                opacity: isSaving ? 0.7 : 1,
+                cursor: isSaving ? "wait" : "pointer",
+              }}
+            >
+              <Save size={14} />
+              {isSaving ? "Sauvegarde..." : "Sauvegarder"}
+            </button>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="px-8 py-8 max-w-5xl">
+          {renderSection()}
+
+          {activeSection !== "overview" && activeSection !== "embed" && activeSection !== "calendar" && activeSection !== "prompt" && (
+            <div className="mt-8 pt-6 border-t border-[#E0E0E0]">
+              <button
+                onClick={handleSave}
+                disabled={isSaving}
+                className="px-6 py-2.5 transition-colors"
+                style={{
+                  fontFamily: "'Space Mono', monospace",
+                  fontSize: "13px",
+                  borderRadius: "2px",
+                  background: "#3898EC",
+                  color: "white",
+                  border: "1px solid #3898EC",
+                  opacity: isSaving ? 0.7 : 1,
+                  cursor: isSaving ? "wait" : "pointer",
+                }}
+              >
+                {isSaving ? "Sauvegarde en cours..." : "Sauvegarder les modifications"}
+              </button>
+            </div>
+          )}
         </div>
       </main>
+    </div>
+  );
+}
+
+function UsageCard({ usage }: { usage: UsageStatus }) {
+  const color =
+    usage.status === "limit_reached"
+      ? "#ef4444"
+      : usage.status === "warning"
+      ? "#f59e0b"
+      : "#22C55E";
+  const label =
+    usage.status === "limit_reached"
+      ? "Quota atteint"
+      : usage.status === "warning"
+      ? "Quota bientôt atteint"
+      : "Consommation normale";
+
+  return (
+    <div className="p-5 border border-[#E0E0E0]" style={{ borderRadius: "2px" }}>
+      <div className="flex items-center justify-between mb-4">
+        <div
+          style={{
+            fontFamily: "'Space Mono', monospace",
+            fontSize: "11px",
+            textTransform: "uppercase",
+            letterSpacing: "0.06em",
+            color: "rgba(0,0,0,0.42)",
+          }}
+        >
+          Consommation IA — {usage.month}
+        </div>
+        <span
+          style={{
+            fontFamily: "'Space Mono', monospace",
+            fontSize: "11px",
+            fontWeight: 700,
+            color,
+          }}
+        >
+          {label}
+        </span>
+      </div>
+      <div className="flex items-baseline gap-2 mb-3">
+        <span
+          style={{
+            fontFamily: "'Space Mono', monospace",
+            fontSize: "32px",
+            fontWeight: 700,
+            color: "#000000",
+          }}
+        >
+          {usage.responses}
+        </span>
+        <span
+          style={{
+            fontFamily: "'Space Mono', monospace",
+            fontSize: "14px",
+            color: "rgba(0,0,0,0.42)",
+          }}
+        >
+          / {usage.monthlyQuota} réponses
+        </span>
+      </div>
+      <div className="w-full h-2 bg-[#F0F0F0]" style={{ borderRadius: "1px" }}>
+        <div
+          className="h-full transition-all"
+          style={{
+            width: `${Math.min(usage.percentage, 100)}%`,
+            background: color,
+            borderRadius: "1px",
+          }}
+        />
+      </div>
+      <div
+        className="mt-2"
+        style={{
+          fontFamily: "'Space Mono', monospace",
+          fontSize: "12px",
+          color: "rgba(0,0,0,0.42)",
+        }}
+      >
+        {usage.percentage}% utilisé
+      </div>
+    </div>
+  );
+}
+
+function StatCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="p-5 border border-[#E0E0E0]" style={{ borderRadius: "2px" }}>
+      <div
+        style={{
+          fontFamily: "'Space Mono', monospace",
+          fontSize: "11px",
+          textTransform: "uppercase",
+          letterSpacing: "0.06em",
+          color: "rgba(0,0,0,0.42)",
+          marginBottom: "8px",
+        }}
+      >
+        {label}
+      </div>
+      <div
+        style={{
+          fontFamily: "'Space Mono', monospace",
+          fontSize: "32px",
+          fontWeight: 700,
+          color: "#000000",
+        }}
+      >
+        {value}
+      </div>
     </div>
   );
 }

@@ -1,26 +1,140 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-background: #ffffff;
+  --color-foreground: #000000;
+  --font-sans: ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'Space Mono', 'Courier New', monospace;
+  --font-serif: 'Georgia', 'Times New Roman', serif;
+  
+  /* Dashboard Design System */
+  --color-dash-primary: #3898EC;
+  --color-dash-secondary: #22C55E;
+  --color-dash-accent: #3898EC;
+  --color-dash-bg: #FFFFFF;
+  --color-dash-text: #000000;
+  --color-dash-link: #2070D0;
+  --color-dash-border: #E0E0E0;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+@font-face {
+  font-family: 'Space Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('https://fonts.gstatic.com/s/spacemono/v12/i7dPIFZifjKcF5UAWdDRYEF8RQ.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Space Mono';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('https://fonts.gstatic.com/s/spacemono/v12/i7dMIFZifjKcF5UAWdDRaPpZYFKQHw.woff2') format('woff2');
+}
+
+html {
+  font-family: 'Space Mono', 'Courier New', monospace;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: #ffffff;
+  color: #000000;
+  font-family: 'Space Mono', 'Courier New', monospace;
+}
+
+/* Chatbot Design System - Scoped */
+.chatbot-theme {
+  --cb-bg-primary: #F5F3EE;
+  --cb-bg-surface: #FCFBF8;
+  --cb-bg-dark: #0c0b09;
+  --cb-text-primary: #111111;
+  --cb-text-secondary: rgba(17,17,17,0.68);
+  --cb-text-muted: rgba(17,17,17,0.42);
+  --cb-text-on-dark: #F5F3EE;
+  --cb-accent: #a0886d;
+  --cb-border: rgba(17,17,17,0.10);
+  --cb-border-dark: rgba(245,243,238,0.14);
+  --cb-radius: 6px;
+  --cb-radius-sm: 4px;
+  
+  font-family: var(--cb-font-family, Georgia, 'Times New Roman', serif);
+}
+
+/* Dashboard utility classes */
+.dashboard-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #E0E0E0;
+  border-radius: 2px;
+  font-family: 'Space Mono', 'Courier New', monospace;
+  font-size: 13px;
+  color: #000000;
+  background: white;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+.dashboard-input:focus {
+  border-color: #3898EC;
+}
+.dashboard-input::placeholder {
+  color: rgba(0,0,0,0.32);
+}
+
+.dashboard-label {
+  display: block;
+  font-family: 'Space Mono', 'Courier New', monospace;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(0,0,0,0.58);
+  margin-bottom: 6px;
+}
+
+.dashboard-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: #3898EC;
+  color: white;
+  border: 1px solid #3898EC;
+  border-radius: 2px;
+  font-family: 'Space Mono', 'Courier New', monospace;
+  font-size: 13px;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+.dashboard-btn-primary:hover {
+  opacity: 0.9;
+}
+.dashboard-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.dashboard-section-title {
+  font-family: 'Space Mono', 'Courier New', monospace;
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 16px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.15);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0,0,0,0.25);
 }
