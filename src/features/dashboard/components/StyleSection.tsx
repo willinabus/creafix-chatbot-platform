@@ -6,192 +6,8 @@
 "use client";
 
 import { ChatbotStyle } from "@/features/chatbot/types";
-
-function ChatbotPreview({ style, branding }: { style: ChatbotStyle; branding: { name: string; companyName?: string } }) {
-  const botName = branding.name || "Clarissa";
-  const subtitle = branding.companyName || "En ligne";
-
-  return (
-    <div
-      className="flex flex-col"
-      style={{
-        width: "100%",
-        height: "100%",
-        minHeight: "480px",
-        background: style.widgetBgColor || "#FCFBF8",
-        border: "1px solid rgba(17,17,17,0.10)",
-        borderRadius: style.borderRadius || "6px",
-        overflow: "hidden",
-        fontFamily: style.fontFamily || "Georgia, 'Times New Roman', serif",
-        fontSize: style.fontSize || "15px",
-        boxShadow: style.shadow || "0 1px 3px rgba(0,0,0,0.08)",
-      }}
-    >
-      {/* Header — identical to ChatHeader */}
-      <div
-        className="flex items-center justify-between px-5 py-4"
-        style={{
-          background: style.headerColor || "#FCFBF8",
-          borderBottom: `1px solid ${style.borderColor || "rgba(17,17,17,0.08)"}`,
-        }}
-      >
-        <div className="flex items-center gap-3">
-          <div
-            className="flex items-center justify-center"
-            style={{
-              width: "36px",
-              height: "36px",
-              borderRadius: "4px",
-              background: "#0c0b09",
-              color: "#F5F3EE",
-              fontFamily: "Georgia, serif",
-              fontSize: "14px",
-              fontWeight: 400,
-              letterSpacing: "0.05em",
-            }}
-          >
-            {botName.charAt(0)}
-          </div>
-          <div>
-            <h3
-              style={{
-                fontFamily: "Georgia, 'Times New Roman', serif",
-                fontSize: "16px",
-                fontWeight: 400,
-                color: style.textColor || "#111111",
-                lineHeight: 1.3,
-                letterSpacing: "0.02em",
-              }}
-            >
-              {botName}
-            </h3>
-            <p
-              style={{
-                fontFamily: "'Space Mono', monospace",
-                fontSize: "11px",
-                color: "rgba(17,17,17,0.42)",
-                lineHeight: 1.3,
-                textTransform: "uppercase",
-                letterSpacing: "0.08em",
-              }}
-            >
-              {subtitle}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Messages area — identical to ChatWidget embedded */}
-      <div
-        className="flex-1 overflow-hidden space-y-3"
-        style={{
-          padding: style.padding || "16px",
-          background: style.secondaryColor || "#F5F3EE",
-        }}
-      >
-        {/* Bot message */}
-        <div className="flex gap-2">
-          <div
-            className="px-3 py-2 max-w-[80%]"
-            style={{
-              background: style.botBubbleColor || "#F5F3EE",
-              borderRadius: "6px",
-              color: style.textColor || "#111",
-              fontSize: "13px",
-              lineHeight: 1.5,
-            }}
-          >
-            Bonjour et bienvenue ! Comment puis-je vous aider aujourd&apos;hui ?
-          </div>
-        </div>
-
-        {/* User message */}
-        <div className="flex justify-end">
-          <div
-            className="px-3 py-2 max-w-[80%]"
-            style={{
-              background: style.userBubbleColor || "#0c0b09",
-              borderRadius: "6px",
-              color: "#F5F3EE",
-              fontSize: "13px",
-              lineHeight: 1.5,
-            }}
-          >
-            Je voudrais prendre rendez-vous
-          </div>
-        </div>
-
-        {/* Bot message 2 */}
-        <div className="flex gap-2">
-          <div
-            className="px-3 py-2 max-w-[80%]"
-            style={{
-              background: style.botBubbleColor || "#F5F3EE",
-              borderRadius: "6px",
-              color: style.textColor || "#111",
-              fontSize: "13px",
-              lineHeight: 1.5,
-            }}
-          >
-            Avec plaisir. Quelle prestation souhaitez-vous ?
-          </div>
-        </div>
-
-        {/* Quick replies */}
-        <div className="flex flex-wrap gap-2 pt-1">
-          {["Coupe femme", "Coupe homme", "Coloration"].map((label) => (
-            <span
-              key={label}
-              className="px-3 py-1.5 text-xs"
-              style={{
-                background: style.buttonColor || "#a0886d",
-                color: "#fff",
-                borderRadius: style.buttonRadius || "4px",
-                fontFamily: "'Space Mono', monospace",
-                cursor: "default",
-              }}
-            >
-              {label}
-            </span>
-          ))}
-        </div>
-      </div>
-
-      {/* Input area — identical to ChatInput look */}
-      <div
-        className="px-3 py-2 flex items-center gap-2"
-        style={{
-          borderTop: `1px solid ${style.borderColor || "rgba(17,17,17,0.10)"}`,
-          background: style.widgetBgColor || "#FCFBF8",
-        }}
-      >
-        <div
-          className="flex-1 px-3 py-2 text-xs"
-          style={{
-            background: "rgba(0,0,0,0.03)",
-            borderRadius: style.borderRadius || "6px",
-            color: "rgba(17,17,17,0.42)",
-            fontFamily: "'Space Mono', monospace",
-          }}
-        >
-          Écrivez votre message...
-        </div>
-        <div
-          className="px-3 py-2 text-xs"
-          style={{
-            background: style.primaryColor || "#a0886d",
-            color: "#fff",
-            borderRadius: style.buttonRadius || "4px",
-            fontFamily: "'Space Mono', monospace",
-            fontWeight: 500,
-          }}
-        >
-          Envoyer
-        </div>
-      </div>
-    </div>
-  );
-}
+import { ChatPreview } from "@/features/chatbot/components/ChatPreview";
+import { defaultChatbotConfig } from "@/features/chatbot/config/chatbotConfig";
 
 interface StyleSectionProps {
   style: ChatbotStyle;
@@ -432,7 +248,13 @@ export function StyleSection({ style, branding, onChange }: StyleSectionProps) {
             className="border border-[#E0E0E0] p-4 flex justify-center"
             style={{ borderRadius: "2px", background: "rgba(0,0,0,0.02)" }}
           >
-            <ChatbotPreview style={style} branding={branding} />
+            <ChatPreview
+              config={{
+                ...defaultChatbotConfig,
+                style: { ...defaultChatbotConfig.style, ...style },
+                branding: { ...defaultChatbotConfig.branding, ...branding },
+              }}
+            />
           </div>
         </div>
       </div>

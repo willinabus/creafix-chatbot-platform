@@ -7,7 +7,7 @@
 
 import { useState } from "react";
 import { Smartphone, Monitor, Tablet } from "lucide-react";
-import { ChatWidget } from "@/features/chatbot/components/ChatWidget";
+import { ChatPreview } from "@/features/chatbot/components/ChatPreview";
 import { ChatbotConfig } from "@/features/chatbot/types";
 
 interface PreviewSectionProps {
@@ -81,7 +81,7 @@ export function PreviewSection({ config }: PreviewSectionProps) {
             background: "#FCFBF8",
           }}
         >
-          <ChatWidget isOpen={true} embedded={true} config={config} />
+          <ChatPreview config={config} />
         </div>
       </div>
 

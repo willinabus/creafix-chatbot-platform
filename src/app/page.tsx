@@ -325,11 +325,7 @@ export default function DashboardPage() {
         );
       case "embed":
         return (
-          <EmbedSection
-            botId={config.id}
-            enabled={config.embedEnabled}
-            onChange={(enabled) => setConfig((p) => ({ ...p, embedEnabled: enabled }))}
-          />
+          <EmbedSection botId={config.id} />
         );
       default:
         return <PreviewSection />;

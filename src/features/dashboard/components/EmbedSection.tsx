@@ -10,11 +10,9 @@ import { Copy, Check } from "lucide-react";
 
 interface EmbedSectionProps {
   botId: string;
-  enabled: boolean;
-  onChange: (enabled: boolean) => void;
 }
 
-export function EmbedSection({ botId, enabled, onChange }: EmbedSectionProps) {
+export function EmbedSection({ botId }: EmbedSectionProps) {
   const [copied, setCopied] = useState(false);
   const hostUrl = typeof window !== "undefined" ? window.location.origin : "";
 
@@ -62,23 +60,6 @@ export function EmbedSection({ botId, enabled, onChange }: EmbedSectionProps) {
         >
           Code d&apos;intégration pour n&apos;importe quel site web
         </p>
-      </div>
-
-      <div className="flex items-center gap-3 p-4 border border-[#E0E0E0]" style={{ borderRadius: "2px" }}>
-        <input
-          type="checkbox"
-          checked={enabled}
-          onChange={(e) => onChange(e.target.checked)}
-          className="w-4 h-4"
-        />
-        <span
-          style={{
-            fontFamily: "'Space Mono', monospace",
-            fontSize: "13px",
-          }}
-        >
-          Activer l&apos;intégration par script
-        </span>
       </div>
 
       {/* Script Embed */}
