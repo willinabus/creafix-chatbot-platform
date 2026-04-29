@@ -287,6 +287,22 @@ export default function DashboardPage() {
     }
   };
 
+  const handleResetUsage = async (botId: string) => {
+    try {
+      const res = await fetch(`/api/usage?botId=${botId}`, { method: "DELETE" });
+      const data = await res.json();
+      if (data.success) {
+        setUsage(data.data);
+        setSaveMessage("Compteur réinitialisé");
+        setTimeout(() => setSaveMessage(""), 3000);
+      } else {
+        setSaveMessage("Erreur lors du reset");
+      }
+    } catch {
+      setSaveMessage("Erreur réseau");
+    }
+  };
+
   const renderSection = () => {
     switch (activeSection) {
       case "overview":
@@ -297,7 +313,9 @@ export default function DashboardPage() {
               <StatCard label="Rendez-vous" value="5" />
               <StatCard label="Taux de conversion" value="42%" />
             </div>
-            {usage && <UsageCard usage={usage} />}
+            {usage && selectedBotId && (
+              <UsageCard usage={usage} botId={selectedBotId} onReset={handleResetUsage} />
+            )}
             <PreviewSection config={config} />
           </div>
         );
@@ -577,7 +595,7 @@ export default function DashboardPage() {
   );
 }
 
-function UsageCard({ usage }: { usage: UsageStatus }) {
+function UsageCard({ usage, botId, onReset }: { usage: UsageStatus; botId: string; onReset?: (botId: string) => void }) {
   const color =
     usage.status === "limit_reached"
       ? "#ef4444"
@@ -605,16 +623,35 @@ function UsageCard({ usage }: { usage: UsageStatus }) {
         >
           Consommation IA — {usage.month}
         </div>
-        <span
-          style={{
-            fontFamily: "'Space Mono', monospace",
-            fontSize: "11px",
-            fontWeight: 700,
-            color,
-          }}
-        >
-          {label}
-        </span>
+        <div className="flex items-center gap-2">
+          <span
+            style={{
+              fontFamily: "'Space Mono', monospace",
+              fontSize: "11px",
+              fontWeight: 700,
+              color,
+            }}
+          >
+            {label}
+          </span>
+          {onReset && (
+            <button
+              onClick={() => onReset(botId)}
+              className="px-2 py-0.5 border border-[#E0E0E0] hover:border-[#ef4444] hover:text-[#ef4444] transition-colors"
+              style={{
+                fontFamily: "'Space Mono', monospace",
+                fontSize: "10px",
+                borderRadius: "2px",
+                background: "white",
+                color: "rgba(0,0,0,0.52)",
+                cursor: "pointer",
+              }}
+              title="Réinitialiser le compteur de ce mois"
+            >
+              Reset
+            </button>
+          )}
+        </div>
       </div>
       <div className="flex items-baseline gap-2 mb-3">
         <span

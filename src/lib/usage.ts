@@ -102,6 +102,30 @@ export async function isQuotaExceeded(botId: string): Promise<boolean> {
   return status.status === "limit_reached";
 }
 
+export async function resetUsage(botId: string): Promise<UsageStatus> {
+  const month = getCurrentMonth();
+
+  await prisma.usageRecord.upsert({
+    where: {
+      botId_month: { botId, month },
+    },
+    update: {
+      responses: 0,
+      inputTokens: 0,
+      outputTokens: 0,
+    },
+    create: {
+      botId,
+      month,
+      responses: 0,
+      inputTokens: 0,
+      outputTokens: 0,
+    },
+  });
+
+  return getUsageStatus(botId);
+}
+
 export async function getAllBotsUsage(): Promise<
   Array<{
     botId: string;
