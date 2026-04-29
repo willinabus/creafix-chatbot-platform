@@ -131,13 +131,14 @@ export async function getAllBotsUsage(): Promise<
     }),
   ]);
 
-  const recordMap = new Map(
+  const recordMap = new Map<string, number>(
     records.map((r: { botId: string; responses: number }) => [r.botId, r.responses])
   );
 
   return bots.map((bot: { id: string; name: string; companyName: string; plan: string; status: string; monthlyQuota: number }) => {
-    const responses = recordMap.get(bot.id) || 0;
-    const percentage = Math.round((responses / bot.monthlyQuota) * 100);
+    const responses: number = recordMap.get(bot.id) ?? 0;
+    const quota: number = bot.monthlyQuota;
+    const percentage = Math.round((responses / quota) * 100);
     let status: UsageStatus["status"] = "normal";
     if (percentage >= 100) status = "limit_reached";
     else if (percentage >= 80) status = "warning";
