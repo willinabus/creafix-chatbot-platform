@@ -76,7 +76,7 @@ npm install
 npm run dev
 ```
 
-Crée un fichier `.env.local` à la racine (voir `.env.example` pour le format).
+Crée un fichier `.env.local` à la racine (voir `env.example` pour le format).
 
 ## Structure du projet
 
