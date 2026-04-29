@@ -50,7 +50,8 @@ export async function POST(request: NextRequest) {
     const result = await processMessage(
       message,
       context || { collectedData: {} },
-      history || []
+      history || [],
+      resolvedBotId
     );
 
     // Track usage for AI-generated responses (skip welcome and direct responses without AI)

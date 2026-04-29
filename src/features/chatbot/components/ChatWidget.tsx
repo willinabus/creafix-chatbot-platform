@@ -19,15 +19,16 @@ interface ChatWidgetProps {
   isOpen?: boolean;
   onToggle?: () => void;
   embedded?: boolean;
+  botId?: string;
 }
 
-export function ChatWidget({ isOpen: controlledOpen, onToggle, embedded = false }: ChatWidgetProps) {
+export function ChatWidget({ isOpen: controlledOpen, onToggle, embedded = false, botId }: ChatWidgetProps) {
   const [internalOpen, setInternalOpen] = useState(false);
   const isOpen = controlledOpen ?? internalOpen;
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const { messages, isLoading, sendMessage, sendQuickReply, resetConversation } = useChat();
+  const { messages, isLoading, sendMessage, sendQuickReply, resetConversation } = useChat({ botId });
 
   const config = defaultChatbotConfig;
 

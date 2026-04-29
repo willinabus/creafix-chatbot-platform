@@ -12,11 +12,12 @@ import { ChatWidget } from "@/features/chatbot/components/ChatWidget";
 function WidgetPreviewContent() {
   const searchParams = useSearchParams();
   const isEmbedded = searchParams.get("embedded") === "true";
+  const botId = searchParams.get("botId") || "clarissa-v1";
 
   if (isEmbedded) {
     return (
       <div className="h-screen w-screen overflow-hidden">
-        <ChatWidget isOpen={true} embedded={true} />
+        <ChatWidget isOpen={true} embedded={true} botId={botId} />
       </div>
     );
   }
@@ -57,7 +58,7 @@ function WidgetPreviewContent() {
           boxShadow: "0 2px 12px rgba(0,0,0,0.08)",
         }}
       >
-        <ChatWidget isOpen={true} embedded={true} />
+        <ChatWidget isOpen={true} embedded={true} botId={botId} />
       </div>
     </div>
   );

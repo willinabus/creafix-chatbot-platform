@@ -38,29 +38,56 @@ export default function DashboardPage() {
     createdAt: string;
   }
 
-  const [bots, setBots] = useState<Bot[]>([
-    {
-      id: "clarissa-v1",
-      name: "Clarissa",
-      companyName: "La Coiffure Clarissa",
-      status: "active",
-      createdAt: "2026-04-28",
-    },
-  ]);
+  const [bots, setBots] = useState<Bot[]>([]);
 
-  // Load saved config on mount
+  // Load bots list from DB on mount
   useEffect(() => {
-    fetch("/api/config")
+    fetch("/api/bots")
       .then((r) => r.json())
       .then((data) => {
-        if (data.success) {
-          setConfig((prev) => ({ ...prev, ...data.data }));
+        if (data.success && data.data.length > 0) {
+          setBots(data.data);
+        } else {
+          // Fallback: if DB is empty, show default
+          setBots([
+            {
+              id: "clarissa-v1",
+              name: "Clarissa",
+              companyName: "La Coiffure Clarissa",
+              status: "active",
+              createdAt: "2026-04-28",
+            },
+          ]);
         }
       })
       .catch(() => {
-        // keep defaults
+        setBots([
+          {
+            id: "clarissa-v1",
+            name: "Clarissa",
+            companyName: "La Coiffure Clarissa",
+            status: "active",
+            createdAt: "2026-04-28",
+          },
+        ]);
       });
   }, []);
+
+  // Load saved config when selecting a bot
+  useEffect(() => {
+    if (selectedBotId) {
+      fetch(`/api/config?botId=${selectedBotId}`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.success) {
+            setConfig((prev) => ({ ...prev, ...data.data }));
+          }
+        })
+        .catch(() => {
+          // keep defaults
+        });
+    }
+  }, [selectedBotId]);
 
   // Load usage data
   useEffect(() => {
@@ -89,33 +116,49 @@ export default function DashboardPage() {
     setSelectedBotId(null);
   };
 
-  const handleDuplicateBot = (botId: string) => {
-    const original = bots.find((b) => b.id === botId);
-    if (!original) return;
-
-    const newBot = {
-      id: `${botId}-copy-${Date.now()}`,
-      name: `${original.name} (copie)`,
-      companyName: `${original.companyName} (copie)`,
-      status: "draft" as const,
-      createdAt: new Date().toISOString().split("T")[0],
-    };
-
-    setBots((prev) => [...prev, newBot]);
-    setSaveMessage(`Chatbot "${newBot.name}" dupliqué`);
-    setTimeout(() => setSaveMessage(""), 3000);
+  const handleDuplicateBot = async (botId: string) => {
+    try {
+      const res = await fetch("/api/bots", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "duplicate", botId }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        const newBot = data.data;
+        setBots((prev) => [
+          { id: newBot.id, name: newBot.name, companyName: newBot.companyName, status: newBot.status, createdAt: newBot.createdAt },
+          ...prev,
+        ]);
+        setSaveMessage(`Chatbot "${newBot.name}" dupliqué`);
+        setTimeout(() => setSaveMessage(""), 3000);
+      } else {
+        setSaveMessage("Erreur lors de la duplication");
+      }
+    } catch {
+      setSaveMessage("Erreur réseau");
+    }
   };
 
-  const handleCreateBot = () => {
-    const newBot = {
-      id: `bot-${Date.now()}`,
-      name: "Nouveau chatbot",
-      companyName: "Mon entreprise",
-      status: "draft" as const,
-      createdAt: new Date().toISOString().split("T")[0],
-    };
-    setBots((prev) => [...prev, newBot]);
-    handleSelectBot(newBot.id);
+  const handleCreateBot = async () => {
+    try {
+      const res = await fetch("/api/bots", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "create" }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        const newBot = data.data;
+        setBots((prev) => [
+          { id: newBot.id, name: newBot.name, companyName: newBot.companyName, status: newBot.status, createdAt: newBot.createdAt },
+          ...prev,
+        ]);
+        handleSelectBot(newBot.id);
+      }
+    } catch {
+      setSaveMessage("Erreur lors de la création");
+    }
   };
 
   const updateBranding = (values: Partial<typeof config.branding>) => {

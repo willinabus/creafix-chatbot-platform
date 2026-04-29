@@ -35,9 +35,10 @@ export interface ProcessMessageResult {
 export async function processMessage(
   userMessage: string,
   context: ConversationContext,
-  history: Message[]
+  history: Message[],
+  botId?: string
 ): Promise<ProcessMessageResult> {
-  const config = await getChatbotConfig();
+  const config = await getChatbotConfig(botId);
 
   // Handle welcome trigger — ALWAYS fixed message, never AI-generated
   if (userMessage === "__WELCOME__") {
