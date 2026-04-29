@@ -397,19 +397,33 @@ export default function DashboardPage() {
             >
               CREAFIX Chatbots v1
             </div>
-            <a
-              href="/privacy"
-              style={{
-                fontFamily: "'Space Mono', monospace",
-                fontSize: "10px",
-                color: "rgba(0,0,0,0.32)",
-                marginTop: "4px",
-                display: "inline-block",
-                textDecoration: "underline",
-              }}
-            >
-              Politique de confidentialité
-            </a>
+            <div style={{ marginTop: "4px" }}>
+              <a
+                href="/privacy"
+                style={{
+                  fontFamily: "'Space Mono', monospace",
+                  fontSize: "10px",
+                  color: "rgba(0,0,0,0.32)",
+                  display: "inline-block",
+                  textDecoration: "underline",
+                  marginRight: "8px",
+                }}
+              >
+                Confidentialité
+              </a>
+              <a
+                href="/terms"
+                style={{
+                  fontFamily: "'Space Mono', monospace",
+                  fontSize: "10px",
+                  color: "rgba(0,0,0,0.32)",
+                  display: "inline-block",
+                  textDecoration: "underline",
+                }}
+              >
+                Conditions d&apos;utilisation
+              </a>
+            </div>
           </div>
         </nav>
 
