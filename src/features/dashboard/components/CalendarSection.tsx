@@ -241,6 +241,38 @@ export function CalendarSection({ provider, botId, onChange }: CalendarSectionPr
             <li>Le calendrier est automatiquement connecté</li>
           </ol>
         </div>
+
+        {/* Troubleshooting */}
+        <div
+          className="p-4 border border-[#E0E0E0]"
+          style={{ borderRadius: "2px", background: "rgba(239,68,68,0.03)" }}
+        >
+          <p
+            style={{
+              fontFamily: "'Space Mono', monospace",
+              fontSize: "12px",
+              color: "rgba(0,0,0,0.62)",
+              lineHeight: 1.6,
+            }}
+          >
+            <strong style={{ color: "#ef4444" }}>Erreur "Accès bloqué" ?</strong>
+          </p>
+          <ul
+            style={{
+              fontFamily: "'Space Mono', monospace",
+              fontSize: "12px",
+              color: "rgba(0,0,0,0.62)",
+              lineHeight: 1.7,
+              marginTop: "8px",
+              paddingLeft: "16px",
+            }}
+          >
+            <li>Votre app Google Cloud est probablement en mode <strong>Testing</strong>.</li>
+            <li>Ajoutez l&apos;email du client dans <strong>Test users</strong> (APIs &amp; Services &gt; OAuth consent screen).</li>
+            <li>Ou passez l&apos;app en <strong>Production</strong> (nécessite une vérification Google).</li>
+            <li>Vérifiez aussi que l&apos;URI de redirection dans Google Cloud correspond exactement à votre domaine Vercel.</li>
+          </ul>
+        </div>
       </div>
 
       {/* Provider selection */}

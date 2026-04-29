@@ -13,11 +13,19 @@ export async function GET(request: NextRequest) {
   const botId = searchParams.get("botId") || "default";
 
   const clientId = process.env.GOOGLE_CLIENT_ID;
-  const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/google-calendar/callback`;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+  const redirectUri = `${appUrl}/api/auth/google-calendar/callback`;
 
   if (!clientId) {
     return NextResponse.json(
       { success: false, error: "GOOGLE_CLIENT_ID not configured" },
+      { status: 500 }
+    );
+  }
+
+  if (!appUrl) {
+    return NextResponse.json(
+      { success: false, error: "NEXT_PUBLIC_APP_URL not configured" },
       { status: 500 }
     );
   }
@@ -36,9 +44,13 @@ export async function GET(request: NextRequest) {
     access_type: "offline",
     prompt: "consent",
     state,
+    include_granted_scopes: "true",
   });
 
   const authUrl = `${GOOGLE_OAUTH_URL}?${params.toString()}`;
 
-  return NextResponse.json({ success: true, data: { authUrl, state } });
+  console.log("[OAuth] Generated auth URL:", authUrl);
+  console.log("[OAuth] Redirect URI:", redirectUri);
+
+  return NextResponse.json({ success: true, data: { authUrl, state, redirectUri } });
 }

@@ -395,7 +395,7 @@ export default function DashboardPage() {
                 color: "rgba(0,0,0,0.42)",
               }}
             >
-              v1.0.0
+              CREAFIX Chatbots v1
             </div>
           </div>
         </nav>
