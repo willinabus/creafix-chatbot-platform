@@ -39,28 +39,17 @@ export default function DashboardPage() {
   }
 
   const [bots, setBots] = useState<Bot[]>([]);
+  const [isLoadingBots, setIsLoadingBots] = useState(true);
+  const [isGenerating, setIsGenerating] = useState(false);
 
-  // Load bots list from DB on mount
-  useEffect(() => {
-    fetch("/api/bots")
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.success && data.data.length > 0) {
-          setBots(data.data);
-        } else {
-          // Fallback: if DB is empty, show default
-          setBots([
-            {
-              id: "clarissa-v1",
-              name: "Clarissa",
-              companyName: "La Coiffure Clarissa",
-              status: "active",
-              createdAt: "2026-04-28",
-            },
-          ]);
-        }
-      })
-      .catch(() => {
+  const loadBots = async () => {
+    setIsLoadingBots(true);
+    try {
+      const res = await fetch("/api/bots");
+      const data = await res.json();
+      if (data.success && data.data.length > 0) {
+        setBots(data.data);
+      } else {
         setBots([
           {
             id: "clarissa-v1",
@@ -70,7 +59,25 @@ export default function DashboardPage() {
             createdAt: "2026-04-28",
           },
         ]);
-      });
+      }
+    } catch {
+      setBots([
+        {
+          id: "clarissa-v1",
+          name: "Clarissa",
+          companyName: "La Coiffure Clarissa",
+          status: "active",
+          createdAt: "2026-04-28",
+        },
+      ]);
+    } finally {
+      setIsLoadingBots(false);
+    }
+  };
+
+  // Load bots list from DB on mount
+  useEffect(() => {
+    loadBots();
   }, []);
 
   // Load saved config when selecting a bot
@@ -161,6 +168,89 @@ export default function DashboardPage() {
     }
   };
 
+  const handleGenerateFromUrl = async (url: string) => {
+    setIsGenerating(true);
+    setSaveMessage("");
+    try {
+      // 1. Scrape and generate config
+      const scrapeRes = await fetch("/api/scrape", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+      const scrapeData = await scrapeRes.json();
+
+      if (!scrapeData.success) {
+        setSaveMessage(`Erreur: ${scrapeData.error}`);
+        setIsGenerating(false);
+        return;
+      }
+
+      const generated = scrapeData.data;
+
+      // 2. Create a new bot
+      const createRes = await fetch("/api/bots", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "create",
+          name: generated.name || "Nouveau chatbot",
+          companyName: generated.companyName || "Mon entreprise",
+        }),
+      });
+      const createData = await createRes.json();
+
+      if (!createData.success) {
+        setSaveMessage("Erreur lors de la création du bot");
+        setIsGenerating(false);
+        return;
+      }
+
+      const newBot = createData.data;
+
+      // 3. Save generated config to the new bot
+      const fullConfig = {
+        ...defaultChatbotConfig,
+        id: newBot.id,
+        branding: {
+          name: generated.name || newBot.name,
+          companyName: generated.companyName || newBot.companyName,
+          tagline: generated.tagline || "",
+          welcomeMessage: generated.welcomeMessage || defaultChatbotConfig.branding.welcomeMessage,
+          inputPlaceholder: generated.inputPlaceholder || defaultChatbotConfig.branding.inputPlaceholder,
+        },
+        content: {
+          ...defaultChatbotConfig.content,
+          hours: generated.hours || defaultChatbotConfig.content.hours,
+          address: generated.address || defaultChatbotConfig.content.address,
+          contact: generated.contact || defaultChatbotConfig.content.contact,
+          services: generated.services || defaultChatbotConfig.content.services,
+          faq: generated.faq || defaultChatbotConfig.content.faq,
+        },
+        systemPrompt: generated.systemPrompt || defaultChatbotConfig.systemPrompt,
+      };
+
+      await fetch("/api/config", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(fullConfig),
+      });
+
+      // 4. Update local list and select
+      setBots((prev) => [
+        { id: newBot.id, name: fullConfig.branding.name, companyName: fullConfig.branding.companyName, status: newBot.status, createdAt: newBot.createdAt },
+        ...prev,
+      ]);
+      setSaveMessage(`Chatbot "${fullConfig.branding.name}" généré avec succès`);
+      setTimeout(() => setSaveMessage(""), 3000);
+      handleSelectBot(newBot.id);
+    } catch (err) {
+      setSaveMessage(`Erreur: ${err instanceof Error ? err.message : "inconnue"}`);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const updateBranding = (values: Partial<typeof config.branding>) => {
     setConfig((prev) => ({
       ...prev,
@@ -193,6 +283,8 @@ export default function DashboardPage() {
       });
       if (response.ok) {
         setSaveMessage("Configuration sauvegardée");
+        // Reload bot list so name/tagline changes are reflected
+        await loadBots();
         setTimeout(() => setSaveMessage(""), 3000);
       } else {
         setSaveMessage("Erreur lors de la sauvegarde");
@@ -232,7 +324,7 @@ export default function DashboardPage() {
       case "branding":
         return <BrandingSection config={config.branding} onChange={updateBranding} />;
       case "style":
-        return <StyleSection style={config.style} onChange={updateStyle} />;
+        return <StyleSection style={config.style} branding={config.branding} onChange={updateStyle} />;
       case "content":
         return <ContentSection content={config.content} onChange={updateContent} />;
       case "docs":
@@ -334,6 +426,9 @@ export default function DashboardPage() {
               onSelectBot={handleSelectBot}
               onDuplicateBot={handleDuplicateBot}
               onCreateBot={handleCreateBot}
+              onGenerateFromUrl={handleGenerateFromUrl}
+              isLoading={isLoadingBots}
+              isGenerating={isGenerating}
             />
           </div>
         </main>

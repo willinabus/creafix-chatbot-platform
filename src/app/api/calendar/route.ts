@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { action, params } = body;
 
-    const provider = getCalendarProvider();
+    const provider = await getCalendarProvider();
 
     switch (action) {
       case "check_availability": {

@@ -5,11 +5,21 @@
 
 import { NextResponse } from "next/server";
 import { isOpenAIConfigured } from "@/lib/openai";
-import { getConfigOverride } from "@/features/chatbot/config/chatbotConfig";
+import { prisma } from "@/lib/prisma";
 
-export async function GET() {
-  const config = getConfigOverride();
-  const hasDynamicGoogleToken = !!config?.calendarConfig?.googleRefreshToken;
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const botId = searchParams.get("botId") || "clarissa-v1";
+
+  const dbConfig = await prisma.chatbotConfig.findUnique({
+    where: { id: botId },
+    select: { calendarConfig: true },
+  });
+
+  const calendarConfig = dbConfig?.calendarConfig
+    ? JSON.parse(dbConfig.calendarConfig)
+    : {};
+  const hasDynamicGoogleToken = !!calendarConfig?.googleRefreshToken;
 
   const googleConfigured = !!(
     process.env.GOOGLE_CLIENT_ID &&

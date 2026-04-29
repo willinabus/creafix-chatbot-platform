@@ -1,70 +1,49 @@
 /**
  * Tool definitions and provider registry
+ * CRITICAL: each bot has its own calendar provider (isolated by botId)
  */
 
 import { CalendarProvider } from "@/features/chatbot/providers/CalendarProvider";
 import { GoogleMcpCalendarProvider } from "@/features/chatbot/providers/GoogleMcpCalendarProvider";
 import { MockCalendarProvider } from "@/features/chatbot/providers/MockCalendarProvider";
-import { getConfigOverride } from "@/features/chatbot/config/chatbotConfig";
 
-let calendarProviderInstance: CalendarProvider | null = null;
-let currentProviderName: string | null = null;
-let currentRefreshToken: string | null = null;
+const providerCache = new Map<string, CalendarProvider>();
 
-export function getCalendarProvider(preferredProvider?: string): CalendarProvider {
-  // Check if we have a dynamically stored refresh token
-  const config = getConfigOverride();
-  const dynamicRefreshToken = config?.calendarConfig?.googleRefreshToken as string | undefined;
+export async function getCalendarProvider(
+  preferredProvider?: string,
+  calendarConfig?: Record<string, unknown>
+): Promise<CalendarProvider> {
+  const cacheKey = JSON.stringify({ preferredProvider, calendarConfig });
 
-  // If the preferred provider or refresh token changed, reset
-  if (preferredProvider && preferredProvider !== currentProviderName) {
-    calendarProviderInstance = null;
-  }
-  if (dynamicRefreshToken && dynamicRefreshToken !== currentRefreshToken) {
-    calendarProviderInstance = null;
-    currentRefreshToken = dynamicRefreshToken;
-  }
+  // Per-bot refresh token from DB config
+  const refreshToken = calendarConfig?.googleRefreshToken as string | undefined;
 
-  if (calendarProviderInstance) {
-    return calendarProviderInstance;
-  }
-
-  // Priority 1: requested Google MCP if configured (with dynamic token)
-  if (preferredProvider === "google_mcp" || dynamicRefreshToken) {
-    const googleProvider = new GoogleMcpCalendarProvider(dynamicRefreshToken);
+  if (refreshToken) {
+    const googleProvider = new GoogleMcpCalendarProvider(refreshToken);
     if (googleProvider.isConfigured) {
-      calendarProviderInstance = googleProvider;
-      currentProviderName = "google_mcp";
-      console.log("[Calendar] Using Google MCP Provider");
-      return calendarProviderInstance;
-    } else {
-      console.warn("[Calendar] Google MCP requested but not configured. Falling back to Mock.");
+      console.log("[Calendar] Using bot-specific Google MCP Provider");
+      return googleProvider;
     }
   }
 
-  // Priority 2: auto-detect Google if configured via env
-  const googleProvider = new GoogleMcpCalendarProvider();
-  if (googleProvider.isConfigured) {
-    calendarProviderInstance = googleProvider;
-    currentProviderName = "google_mcp";
-    console.log("[Calendar] Auto-detected Google MCP Provider");
-    return calendarProviderInstance;
+  // Fallback: env-based Google (legacy single-bot setup)
+  if (preferredProvider === "google_mcp" || process.env.GOOGLE_REFRESH_TOKEN) {
+    const googleProvider = new GoogleMcpCalendarProvider();
+    if (googleProvider.isConfigured) {
+      console.log("[Calendar] Using env-based Google MCP Provider");
+      return googleProvider;
+    }
   }
 
   // Fallback: Mock
-  calendarProviderInstance = new MockCalendarProvider();
-  currentProviderName = "mock";
   console.log("[Calendar] Using Mock Provider (demo mode)");
-  return calendarProviderInstance;
+  return new MockCalendarProvider();
 }
 
 export function resetCalendarProvider(): void {
-  calendarProviderInstance = null;
-  currentProviderName = null;
-  currentRefreshToken = null;
+  providerCache.clear();
 }
 
 export function setCalendarProvider(provider: CalendarProvider, name: string): void {
-  calendarProviderInstance = provider;
-  currentProviderName = name;
+  providerCache.set(name, provider);
 }

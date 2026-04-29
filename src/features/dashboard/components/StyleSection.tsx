@@ -7,50 +7,88 @@
 
 import { ChatbotStyle } from "@/features/chatbot/types";
 
-interface StyleSectionProps {
-  style: ChatbotStyle;
-  onChange: (values: Partial<ChatbotStyle>) => void;
-}
+function ChatbotPreview({ style, branding }: { style: ChatbotStyle; branding: { name: string; companyName?: string } }) {
+  const botName = branding.name || "Clarissa";
+  const subtitle = branding.companyName || "En ligne";
 
-function ChatbotPreview({ style }: { style: ChatbotStyle }) {
   return (
     <div
-      className="border border-[#E0E0E0] flex flex-col"
+      className="flex flex-col"
       style={{
-        width: style.widgetWidth || "320px",
-        height: style.maxHeight || "480px",
-        borderRadius: style.borderRadius || "6px",
+        width: "100%",
+        height: "100%",
+        minHeight: "480px",
         background: style.widgetBgColor || "#FCFBF8",
-        boxShadow: style.shadow || "0 1px 3px rgba(0,0,0,0.08)",
+        border: "1px solid rgba(17,17,17,0.10)",
+        borderRadius: style.borderRadius || "6px",
         overflow: "hidden",
-        fontFamily: style.fontFamily || "Georgia, serif",
+        fontFamily: style.fontFamily || "Georgia, 'Times New Roman', serif",
         fontSize: style.fontSize || "15px",
+        boxShadow: style.shadow || "0 1px 3px rgba(0,0,0,0.08)",
       }}
     >
-      {/* Header */}
+      {/* Header — identical to ChatHeader */}
       <div
-        className="px-4 py-3 flex items-center gap-2"
+        className="flex items-center justify-between px-5 py-4"
         style={{
           background: style.headerColor || "#FCFBF8",
-          borderBottom: `1px solid ${style.borderColor || "rgba(17,17,17,0.10)"}`,
+          borderBottom: `1px solid ${style.borderColor || "rgba(17,17,17,0.08)"}`,
         }}
       >
-        <div
-          className="rounded-full"
-          style={{
-            width: 32,
-            height: 32,
-            background: style.primaryColor || "#a0886d",
-          }}
-        />
-        <div>
-          <div style={{ fontWeight: 700, fontSize: "14px", color: style.textColor || "#111" }}>Clarissa</div>
-          <div style={{ fontSize: "11px", color: "rgba(17,17,17,0.52)" }}>En ligne</div>
+        <div className="flex items-center gap-3">
+          <div
+            className="flex items-center justify-center"
+            style={{
+              width: "36px",
+              height: "36px",
+              borderRadius: "4px",
+              background: "#0c0b09",
+              color: "#F5F3EE",
+              fontFamily: "Georgia, serif",
+              fontSize: "14px",
+              fontWeight: 400,
+              letterSpacing: "0.05em",
+            }}
+          >
+            {botName.charAt(0)}
+          </div>
+          <div>
+            <h3
+              style={{
+                fontFamily: "Georgia, 'Times New Roman', serif",
+                fontSize: "16px",
+                fontWeight: 400,
+                color: style.textColor || "#111111",
+                lineHeight: 1.3,
+                letterSpacing: "0.02em",
+              }}
+            >
+              {botName}
+            </h3>
+            <p
+              style={{
+                fontFamily: "'Space Mono', monospace",
+                fontSize: "11px",
+                color: "rgba(17,17,17,0.42)",
+                lineHeight: 1.3,
+                textTransform: "uppercase",
+                letterSpacing: "0.08em",
+              }}
+            >
+              {subtitle}
+            </p>
+          </div>
         </div>
       </div>
 
-      {/* Messages area */}
-      <div className="flex-1 p-4 space-y-3 overflow-hidden">
+      {/* Messages area — identical to ChatWidget embedded */}
+      <div
+        className="flex-1 overflow-hidden space-y-3"
+        style={{
+          padding: style.padding || "16px",
+          background: style.secondaryColor || "#F5F3EE",
+        }}
+      >
         {/* Bot message */}
         <div className="flex gap-2">
           <div
@@ -60,11 +98,13 @@ function ChatbotPreview({ style }: { style: ChatbotStyle }) {
               borderRadius: "6px",
               color: style.textColor || "#111",
               fontSize: "13px",
+              lineHeight: 1.5,
             }}
           >
-            Bonjour et bienvenue ! Comment puis-je vous aider aujourd hui ?
+            Bonjour et bienvenue ! Comment puis-je vous aider aujourd&apos;hui ?
           </div>
         </div>
+
         {/* User message */}
         <div className="flex justify-end">
           <div
@@ -74,11 +114,13 @@ function ChatbotPreview({ style }: { style: ChatbotStyle }) {
               borderRadius: "6px",
               color: "#F5F3EE",
               fontSize: "13px",
+              lineHeight: 1.5,
             }}
           >
             Je voudrais prendre rendez-vous
           </div>
         </div>
+
         {/* Bot message 2 */}
         <div className="flex gap-2">
           <div
@@ -88,11 +130,13 @@ function ChatbotPreview({ style }: { style: ChatbotStyle }) {
               borderRadius: "6px",
               color: style.textColor || "#111",
               fontSize: "13px",
+              lineHeight: 1.5,
             }}
           >
             Avec plaisir. Quelle prestation souhaitez-vous ?
           </div>
         </div>
+
         {/* Quick replies */}
         <div className="flex flex-wrap gap-2 pt-1">
           {["Coupe femme", "Coupe homme", "Coloration"].map((label) => (
@@ -104,6 +148,7 @@ function ChatbotPreview({ style }: { style: ChatbotStyle }) {
                 color: "#fff",
                 borderRadius: style.buttonRadius || "4px",
                 fontFamily: "'Space Mono', monospace",
+                cursor: "default",
               }}
             >
               {label}
@@ -112,11 +157,12 @@ function ChatbotPreview({ style }: { style: ChatbotStyle }) {
         </div>
       </div>
 
-      {/* Input */}
+      {/* Input area — identical to ChatInput look */}
       <div
         className="px-3 py-2 flex items-center gap-2"
         style={{
           borderTop: `1px solid ${style.borderColor || "rgba(17,17,17,0.10)"}`,
+          background: style.widgetBgColor || "#FCFBF8",
         }}
       >
         <div
@@ -125,9 +171,10 @@ function ChatbotPreview({ style }: { style: ChatbotStyle }) {
             background: "rgba(0,0,0,0.03)",
             borderRadius: style.borderRadius || "6px",
             color: "rgba(17,17,17,0.42)",
+            fontFamily: "'Space Mono', monospace",
           }}
         >
-          Ecrivez votre message...
+          Écrivez votre message...
         </div>
         <div
           className="px-3 py-2 text-xs"
@@ -135,6 +182,8 @@ function ChatbotPreview({ style }: { style: ChatbotStyle }) {
             background: style.primaryColor || "#a0886d",
             color: "#fff",
             borderRadius: style.buttonRadius || "4px",
+            fontFamily: "'Space Mono', monospace",
+            fontWeight: 500,
           }}
         >
           Envoyer
@@ -144,7 +193,13 @@ function ChatbotPreview({ style }: { style: ChatbotStyle }) {
   );
 }
 
-export function StyleSection({ style, onChange }: StyleSectionProps) {
+interface StyleSectionProps {
+  style: ChatbotStyle;
+  branding: { name: string; companyName?: string };
+  onChange: (values: Partial<ChatbotStyle>) => void;
+}
+
+export function StyleSection({ style, branding, onChange }: StyleSectionProps) {
   const colorFields = [
     { key: "primaryColor", label: "Couleur principale" },
     { key: "secondaryColor", label: "Couleur secondaire" },
@@ -377,7 +432,7 @@ export function StyleSection({ style, onChange }: StyleSectionProps) {
             className="border border-[#E0E0E0] p-4 flex justify-center"
             style={{ borderRadius: "2px", background: "rgba(0,0,0,0.02)" }}
           >
-            <ChatbotPreview style={style} />
+            <ChatbotPreview style={style} branding={branding} />
           </div>
         </div>
       </div>

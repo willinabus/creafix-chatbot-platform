@@ -107,7 +107,7 @@ export async function processMessage(
         const toolCalls = choice.message.tool_calls;
 
         for (const toolCall of toolCalls) {
-          const result = await executeTool(toolCall, contextAfterTools, config.calendarProvider);
+          const result = await executeTool(toolCall, contextAfterTools, config.calendarProvider, config.calendarConfig);
           toolResults.push(result);
           const fnName = (toolCall as { function: { name: string } }).function.name;
           if (fnName === "check_availability" && !result.content.startsWith("Aucun créneau") && !result.content.startsWith("Erreur")) {
@@ -364,14 +364,15 @@ function getToolDefinitions(context: ConversationContext): OpenAI.Chat.ChatCompl
 async function executeTool(
   toolCall: OpenAI.Chat.ChatCompletionMessageToolCall,
   context: ConversationContext,
-  calendarProviderConfig?: string
+  calendarProviderConfig?: string,
+  calendarConfig?: Record<string, unknown>
 ): Promise<ToolResult> {
   const toolCallFn = (toolCall as { function: { name: string; arguments: string } }).function;
   const args = safelyParseJSON(toolCallFn.arguments, {}) as Record<string, unknown>;
 
   switch (toolCallFn.name) {
     case "check_availability": {
-      const provider = getCalendarProvider(calendarProviderConfig);
+      const provider = await getCalendarProvider(calendarProviderConfig, calendarConfig);
       let dateStr = args.date as string;
       // Safeguard: if OpenAI passed a vague time-only string but we have a full preferredDate, use it
       if (context.preferredDate && (!dateStr || /^\d{1,2}h?$/i.test(dateStr))) {
@@ -414,7 +415,7 @@ async function executeTool(
     }
 
     case "book_appointment": {
-      const provider = getCalendarProvider(calendarProviderConfig);
+      const provider = await getCalendarProvider(calendarProviderConfig, calendarConfig);
       try {
         const event = await provider.createEvent({
           name: args.name as string,

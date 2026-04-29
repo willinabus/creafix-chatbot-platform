@@ -5,7 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getChatbotConfig, setConfigOverride, getConfigOverride } from "@/features/chatbot/config/chatbotConfig";
+import { prisma } from "@/lib/prisma";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -73,23 +73,19 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Store the refresh_token in the chatbot config
-    const currentConfig = getConfigOverride() || {};
-    const mergedConfig = {
-      ...currentConfig,
-      calendarProvider: "google_mcp",
-      calendarConfig: {
-        ...(currentConfig.calendarConfig || {}),
-        googleRefreshToken: tokenData.refresh_token,
-        googleAccessToken: tokenData.access_token,
-        googleTokenExpiry: Date.now() + tokenData.expires_in * 1000,
-        connectedAt: new Date().toISOString(),
+    // Store the refresh_token in the bot's DB record (isolated per bot)
+    await prisma.chatbotConfig.update({
+      where: { id: botId },
+      data: {
+        calendarProvider: "google_mcp",
+        calendarConfig: JSON.stringify({
+          googleRefreshToken: tokenData.refresh_token,
+          googleAccessToken: tokenData.access_token,
+          googleTokenExpiry: Date.now() + tokenData.expires_in * 1000,
+          connectedAt: new Date().toISOString(),
+        }),
       },
-    };
-    setConfigOverride(mergedConfig);
-
-    // Also set environment variable for immediate use (until restart)
-    process.env.GOOGLE_REFRESH_TOKEN = tokenData.refresh_token;
+    });
 
     // Return a nice HTML success page
     return new NextResponse(
