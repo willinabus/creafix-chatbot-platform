@@ -8,6 +8,7 @@
 import { useState, useEffect } from "react";
 import { Save, RotateCcw, ChevronLeft, Globe, Loader2 } from "lucide-react";
 import { UsageStatus } from "@/lib/usage";
+import { deepMerge } from "@/lib/utils";
 import { DashboardNav } from "@/features/dashboard/components/DashboardNav";
 import { BrandingSection } from "@/features/dashboard/components/BrandingSection";
 import { StyleSection } from "@/features/dashboard/components/StyleSection";
@@ -88,7 +89,7 @@ export default function DashboardPage() {
         .then((r) => r.json())
         .then((data) => {
           if (data.success) {
-            setConfig((prev) => ({ ...prev, ...data.data }));
+            setConfig((prev) => deepMerge(prev, data.data));
           }
         })
         .catch(() => {

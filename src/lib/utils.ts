@@ -2,6 +2,27 @@
  * Utility functions shared across the app
  */
 
+/**
+ * Deep merge objects — skips null/undefined values from source.
+ * Keeps destination values when source is null/undefined.
+ */
+export function deepMerge<T extends Record<string, any>>(dest: T, source: Partial<T>): T {
+  const result: any = { ...dest };
+  for (const key of Object.keys(source)) {
+    const sVal = (source as any)[key];
+    if (sVal === null || sVal === undefined) {
+      continue; // keep destination value
+    }
+    const dVal = result[key];
+    if (typeof dVal === "object" && dVal !== null && !Array.isArray(dVal) && typeof sVal === "object" && !Array.isArray(sVal)) {
+      result[key] = deepMerge(dVal, sVal);
+    } else {
+      result[key] = sVal;
+    }
+  }
+  return result;
+}
+
 export function cn(...classes: (string | undefined | null | false)[]): string {
   return classes.filter(Boolean).join(" ");
 }

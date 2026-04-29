@@ -67,28 +67,46 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Fetch the website
-    const response = await fetch(url, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; ChatbotScraper/1.0)",
-      },
-      // 8 second timeout
-      signal: AbortSignal.timeout(8000),
-    });
+    // Fetch the website with manual timeout (AbortSignal.timeout not always available)
+    const fetchWithTimeout = (targetUrl: string, ms: number) =>
+      Promise.race([
+        fetch(targetUrl, {
+          headers: {
+            "User-Agent": "Mozilla/5.0 (compatible; ChatbotScraper/1.0)",
+          },
+        }),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error(`Fetch timeout after ${ms}ms`)), ms)
+        ),
+      ]);
+
+    let response: Response;
+    try {
+      response = await fetchWithTimeout(url, 10000) as Response;
+    } catch (fetchErr) {
+      console.error("[API /scrape] Fetch failed:", fetchErr);
+      return NextResponse.json(
+        { success: false, error: `Impossible d'accéder à l'URL : ${fetchErr instanceof Error ? fetchErr.message : "erreur réseau"}` },
+        { status: 502 }
+      );
+    }
 
     if (!response.ok) {
       return NextResponse.json(
-        { success: false, error: `Failed to fetch URL: ${response.status}` },
+        { success: false, error: `Le site a répondu avec l'erreur ${response.status}` },
         { status: 502 }
       );
     }
 
     const html = await response.text();
+    console.log(`[API /scrape] Fetched ${html.length} chars from ${url}`);
+
     const extractedText = extractTextFromHTML(html, url);
+    console.log(`[API /scrape] Extracted ${extractedText.length} chars`);
 
     if (extractedText.length < 100) {
       return NextResponse.json(
-        { success: false, error: "Could not extract enough content from this page" },
+        { success: false, error: "Le contenu du site est trop court pour générer une configuration. Essayez une autre URL (page d'accueil ou page principale)." },
         { status: 422 }
       );
     }
@@ -134,23 +152,40 @@ RÈGLES :
       completion = await createChatCompletion({
         messages: [{ role: "user", content: prompt }],
         temperature: 0.7,
-        model: "gpt-5-nano-2025-08-07",
       });
     } catch (modelError) {
-      // Fallback if gpt-5-nano is not available
-      console.warn("[Scrape] gpt-5-nano unavailable, falling back to gpt-4.1-nano:", modelError);
-      completion = await createChatCompletion({
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0.7,
-        model: "gpt-4.1-nano-2025-04-14",
-      });
+      console.warn("[Scrape] Primary model failed, falling back:", modelError);
+      try {
+        completion = await createChatCompletion({
+          messages: [{ role: "user", content: prompt }],
+          temperature: 0.7,
+          model: "gpt-4.1-nano-2025-04-14",
+        });
+      } catch (fallbackErr) {
+        console.error("[Scrape] Fallback model also failed:", fallbackErr);
+        return NextResponse.json(
+          { success: false, error: "L'IA n'a pas pu générer la configuration. Vérifiez votre clé OpenAI et réessayez." },
+          { status: 500 }
+        );
+      }
     }
 
     const raw = completion.choices[0].message.content || "";
+    console.log("[API /scrape] Raw OpenAI response:", raw.slice(0, 500));
+
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     const jsonStr = jsonMatch ? jsonMatch[0] : raw;
 
-    const generated = JSON.parse(jsonStr);
+    let generated;
+    try {
+      generated = JSON.parse(jsonStr);
+    } catch (parseErr) {
+      console.error("[API /scrape] JSON parse failed:", parseErr);
+      return NextResponse.json(
+        { success: false, error: "L'IA n'a pas retourné un JSON valide. Réessayez avec une autre URL." },
+        { status: 422 }
+      );
+    }
 
     return NextResponse.json({
       success: true,

@@ -246,6 +246,7 @@ export async function duplicateChatbot(originalId: string, newName?: string) {
 
 export async function createDefaultChatbot(name: string, companyName: string) {
   const id = `bot-${Date.now()}`;
+  const d = defaultChatbotConfig;
   try {
     return await prisma.chatbotConfig.create({
       data: {
@@ -256,6 +257,43 @@ export async function createDefaultChatbot(name: string, companyName: string) {
         systemPrompt: DEFAULT_SYSTEM_PROMPT,
         welcomeMessage: `Bonjour et bienvenue chez ${companyName}, je suis ${name}.\n\nQue souhaitez-vous faire aujourd'hui ?`,
         inputPlaceholder: "Écrivez votre message...",
+        // Store all default values so unflattenConfig has real data
+        tagline: d.branding.tagline,
+        logoUrl: d.branding.logoUrl,
+        avatarUrl: d.branding.avatarUrl,
+        primaryColor: d.style.primaryColor,
+        secondaryColor: d.style.secondaryColor,
+        accentColor: d.style.accentColor,
+        widgetBgColor: d.style.widgetBgColor,
+        textColor: d.style.textColor,
+        userBubbleColor: d.style.userBubbleColor,
+        botBubbleColor: d.style.botBubbleColor,
+        buttonColor: d.style.buttonColor,
+        borderColor: d.style.borderColor,
+        headerColor: d.style.headerColor,
+        iconColor: d.style.iconColor,
+        borderRadius: d.style.borderRadius,
+        buttonRadius: d.style.buttonRadius,
+        shadow: d.style.shadow,
+        widgetWidth: d.style.widgetWidth,
+        maxHeight: d.style.maxHeight,
+        widgetPosition: d.style.widgetPosition,
+        padding: d.style.padding,
+        fontFamily: d.style.fontFamily,
+        fontSize: d.style.fontSize,
+        fabStyle: d.style.fabStyle,
+        quickReplies: JSON.stringify(d.content.quickReplies),
+        faq: JSON.stringify(d.content.faq),
+        services: JSON.stringify(d.content.services),
+        tone: d.content.tone,
+        humanFallbackCta: d.content.humanFallbackCta,
+        hours: d.content.hours,
+        address: d.content.address,
+        contact: d.content.contact,
+        calendarProvider: d.calendarProvider,
+        calendarConfig: JSON.stringify(d.calendarConfig),
+        embedEnabled: d.embedEnabled,
+        allowedDomains: JSON.stringify(d.allowedDomains),
       },
     });
   } catch (error) {
