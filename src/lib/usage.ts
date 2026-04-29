@@ -136,7 +136,7 @@ export async function getAllBotsUsage(): Promise<
   );
 
   return bots.map((bot: { id: string; name: string; companyName: string; plan: string; status: string; monthlyQuota: number }) => {
-    const responses = recordMap.get(bot.id) ?? 0;
+    const responses = recordMap.get(bot.id) || 0;
     const percentage = Math.round((responses / bot.monthlyQuota) * 100);
     let status: UsageStatus["status"] = "normal";
     if (percentage >= 100) status = "limit_reached";
