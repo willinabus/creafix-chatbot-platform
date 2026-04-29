@@ -135,7 +135,7 @@ export async function getAllBotsUsage(): Promise<
     records.map((r: { botId: string; responses: number }) => [r.botId, r.responses])
   );
 
-  return bots.map((bot) => {
+  return bots.map((bot: { id: string; name: string; companyName: string; plan: string; status: string; monthlyQuota: number }) => {
     const responses = recordMap.get(bot.id) ?? 0;
     const percentage = Math.round((responses / bot.monthlyQuota) * 100);
     let status: UsageStatus["status"] = "normal";
