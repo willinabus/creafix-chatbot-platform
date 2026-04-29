@@ -131,7 +131,9 @@ export async function getAllBotsUsage(): Promise<
     }),
   ]);
 
-  const recordMap = new Map(records.map((r) => [r.botId, r.responses]));
+  const recordMap = new Map(
+    records.map((r: { botId: string; responses: number }) => [r.botId, r.responses])
+  );
 
   return bots.map((bot) => {
     const responses = recordMap.get(bot.id) ?? 0;
