@@ -6,7 +6,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Save, RotateCcw, ChevronLeft } from "lucide-react";
+import { Save, RotateCcw, ChevronLeft, Globe, Loader2 } from "lucide-react";
 import { UsageStatus } from "@/lib/usage";
 import { DashboardNav } from "@/features/dashboard/components/DashboardNav";
 import { BrandingSection } from "@/features/dashboard/components/BrandingSection";
@@ -40,7 +40,8 @@ export default function DashboardPage() {
 
   const [bots, setBots] = useState<Bot[]>([]);
   const [isLoadingBots, setIsLoadingBots] = useState(true);
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [importUrl, setImportUrl] = useState("");
+  const [isImporting, setIsImporting] = useState(false);
 
   const loadBots = async () => {
     setIsLoadingBots(true);
@@ -168,86 +169,64 @@ export default function DashboardPage() {
     }
   };
 
-  const handleGenerateFromUrl = async (url: string) => {
-    setIsGenerating(true);
+  const handleImportFromUrl = async () => {
+    if (!importUrl.trim()) return;
+    setIsImporting(true);
     setSaveMessage("");
     try {
-      // 1. Scrape and generate config
       const scrapeRes = await fetch("/api/scrape", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ url: importUrl.trim() }),
       });
       const scrapeData = await scrapeRes.json();
 
       if (!scrapeData.success) {
         setSaveMessage(`Erreur: ${scrapeData.error}`);
-        setIsGenerating(false);
+        setIsImporting(false);
         return;
       }
 
       const generated = scrapeData.data;
 
-      // 2. Create a new bot
-      const createRes = await fetch("/api/bots", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "create",
-          name: generated.name || "Nouveau chatbot",
-          companyName: generated.companyName || "Mon entreprise",
-        }),
-      });
-      const createData = await createRes.json();
-
-      if (!createData.success) {
-        setSaveMessage("Erreur lors de la création du bot");
-        setIsGenerating(false);
-        return;
-      }
-
-      const newBot = createData.data;
-
-      // 3. Save generated config to the new bot
-      const fullConfig = {
-        ...defaultChatbotConfig,
-        id: newBot.id,
+      const updatedConfig = {
+        ...config,
         branding: {
-          name: generated.name || newBot.name,
-          companyName: generated.companyName || newBot.companyName,
-          tagline: generated.tagline || "",
-          welcomeMessage: generated.welcomeMessage || defaultChatbotConfig.branding.welcomeMessage,
-          inputPlaceholder: generated.inputPlaceholder || defaultChatbotConfig.branding.inputPlaceholder,
+          ...config.branding,
+          name: generated.name || config.branding.name,
+          companyName: generated.companyName || config.branding.companyName,
+          tagline: generated.tagline || config.branding.tagline,
+          welcomeMessage: generated.welcomeMessage || config.branding.welcomeMessage,
+          inputPlaceholder: generated.inputPlaceholder || config.branding.inputPlaceholder,
         },
         content: {
-          ...defaultChatbotConfig.content,
-          hours: generated.hours || defaultChatbotConfig.content.hours,
-          address: generated.address || defaultChatbotConfig.content.address,
-          contact: generated.contact || defaultChatbotConfig.content.contact,
-          services: generated.services || defaultChatbotConfig.content.services,
-          faq: generated.faq || defaultChatbotConfig.content.faq,
+          ...config.content,
+          hours: generated.hours || config.content.hours,
+          address: generated.address || config.content.address,
+          contact: generated.contact || config.content.contact,
+          services: generated.services || config.content.services,
+          faq: generated.faq || config.content.faq,
         },
-        systemPrompt: generated.systemPrompt || defaultChatbotConfig.systemPrompt,
+        systemPrompt: generated.systemPrompt || config.systemPrompt,
       };
 
+      setConfig(updatedConfig);
+
+      // Auto-save
       await fetch("/api/config", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(fullConfig),
+        body: JSON.stringify(updatedConfig),
       });
 
-      // 4. Update local list and select
-      setBots((prev) => [
-        { id: newBot.id, name: fullConfig.branding.name, companyName: fullConfig.branding.companyName, status: newBot.status, createdAt: newBot.createdAt },
-        ...prev,
-      ]);
-      setSaveMessage(`Chatbot "${fullConfig.branding.name}" généré avec succès`);
+      await loadBots();
+      setSaveMessage("Configuration importée et sauvegardée");
+      setImportUrl("");
       setTimeout(() => setSaveMessage(""), 3000);
-      handleSelectBot(newBot.id);
     } catch (err) {
       setSaveMessage(`Erreur: ${err instanceof Error ? err.message : "inconnue"}`);
     } finally {
-      setIsGenerating(false);
+      setIsImporting(false);
     }
   };
 
@@ -426,9 +405,7 @@ export default function DashboardPage() {
               onSelectBot={handleSelectBot}
               onDuplicateBot={handleDuplicateBot}
               onCreateBot={handleCreateBot}
-              onGenerateFromUrl={handleGenerateFromUrl}
               isLoading={isLoadingBots}
-              isGenerating={isGenerating}
             />
           </div>
         </main>
@@ -500,6 +477,44 @@ export default function DashboardPage() {
                 {saveMessage}
               </span>
             )}
+
+            {/* Import from website */}
+            <div className="flex items-center gap-2">
+              <input
+                type="url"
+                value={importUrl}
+                onChange={(e) => setImportUrl(e.target.value)}
+                placeholder="https://www.exemple.ch"
+                className="dashboard-input"
+                disabled={isImporting}
+                style={{
+                  width: "180px",
+                  fontSize: "12px",
+                  fontFamily: "'Space Mono', monospace",
+                  padding: "6px 10px",
+                }}
+              />
+              <button
+                onClick={handleImportFromUrl}
+                disabled={isImporting || !importUrl.trim()}
+                className="flex items-center gap-1.5 px-3 py-2"
+                style={{
+                  fontFamily: "'Space Mono', monospace",
+                  fontSize: "12px",
+                  borderRadius: "2px",
+                  background: isImporting || !importUrl.trim() ? "#E0E0E0" : "#0c0b09",
+                  color: "white",
+                  border: "none",
+                  cursor: isImporting || !importUrl.trim() ? "not-allowed" : "pointer",
+                  whiteSpace: "nowrap",
+                }}
+                title="Importer nom, slogan, services, FAQ et prompt depuis le site"
+              >
+                {isImporting ? <Loader2 size={12} className="animate-spin" /> : <Globe size={12} />}
+                {isImporting ? "Import..." : "Importer"}
+              </button>
+            </div>
+
             <button
               onClick={handleReset}
               className="flex items-center gap-2 px-4 py-2 border border-[#E0E0E0] hover:border-black transition-colors"
