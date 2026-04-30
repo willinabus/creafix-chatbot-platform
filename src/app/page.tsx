@@ -165,6 +165,29 @@ export default function DashboardPage() {
     }
   };
 
+  const handleToggleStatus = async (botId: string, currentStatus: "active" | "draft") => {
+    const newStatus = currentStatus === "active" ? "draft" : "active";
+    try {
+      const res = await fetch("/api/bots", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ botId, status: newStatus }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setBots((prev) =>
+          prev.map((b) => (b.id === botId ? { ...b, status: newStatus } : b))
+        );
+        setSaveMessage(`Chatbot ${newStatus === "active" ? "activé" : "désactivé"}`);
+        setTimeout(() => setSaveMessage(""), 3000);
+      } else {
+        setSaveMessage(`Erreur: ${data.error}`);
+      }
+    } catch {
+      setSaveMessage("Erreur réseau");
+    }
+  };
+
   const handleCreateBot = async () => {
     try {
       const res = await fetch("/api/bots", {
@@ -365,7 +388,7 @@ export default function DashboardPage() {
         );
       case "embed":
         return (
-          <EmbedSection botId={config.id} />
+          <EmbedSection botId={config.id} branding={config.branding} />
         );
       default:
         return <PreviewSection />;
@@ -468,6 +491,7 @@ export default function DashboardPage() {
               onSelectBot={handleSelectBot}
               onDuplicateBot={handleDuplicateBot}
               onDeleteBot={handleDeleteBot}
+              onToggleStatus={handleToggleStatus}
               onCreateBot={handleCreateBot}
               isLoading={isLoadingBots}
             />

@@ -5,7 +5,7 @@
 
 "use client";
 
-import { Bot, Plus, Copy, ArrowRight, Trash2 } from "lucide-react";
+import { Bot, Plus, Copy, ArrowRight, Trash2, Power } from "lucide-react";
 
 interface Bot {
   id: string;
@@ -20,11 +20,12 @@ interface BotSelectorProps {
   onSelectBot: (botId: string) => void;
   onDuplicateBot: (botId: string) => void;
   onDeleteBot: (botId: string) => void;
+  onToggleStatus: (botId: string, currentStatus: "active" | "draft") => void;
   onCreateBot: () => void;
   isLoading?: boolean;
 }
 
-export function BotSelector({ bots, onSelectBot, onDuplicateBot, onDeleteBot, onCreateBot, isLoading }: BotSelectorProps) {
+export function BotSelector({ bots, onSelectBot, onDuplicateBot, onDeleteBot, onToggleStatus, onCreateBot, isLoading }: BotSelectorProps) {
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
@@ -176,6 +177,26 @@ export function BotSelector({ bots, onSelectBot, onDuplicateBot, onDeleteBot, on
               <button
                 onClick={(e) => {
                   e.stopPropagation();
+                  onToggleStatus(bot.id, bot.status);
+                }}
+                className="flex items-center gap-1.5 px-3 py-2 border transition-colors"
+                style={{
+                  fontFamily: "'Space Mono', monospace",
+                  fontSize: "12px",
+                  borderRadius: "2px",
+                  background: bot.status === "active" ? "rgba(34,197,94,0.08)" : "white",
+                  color: bot.status === "active" ? "#22C55E" : "rgba(0,0,0,0.52)",
+                  borderColor: bot.status === "active" ? "rgba(34,197,94,0.2)" : "#E0E0E0",
+                  cursor: "pointer",
+                }}
+                title={bot.status === "active" ? "Désactiver" : "Activer"}
+              >
+                <Power size={12} />
+                {bot.status === "active" ? "On" : "Off"}
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
                   onDuplicateBot(bot.id);
                 }}
                 className="flex items-center gap-1.5 px-3 py-2 border border-[#E0E0E0] hover:border-[#3898EC] transition-colors"
@@ -189,7 +210,6 @@ export function BotSelector({ bots, onSelectBot, onDuplicateBot, onDeleteBot, on
                 title="Dupliquer ce chatbot"
               >
                 <Copy size={12} />
-                Dupliquer
               </button>
               <button
                 onClick={(e) => {

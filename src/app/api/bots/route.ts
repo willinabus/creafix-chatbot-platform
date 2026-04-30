@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { listChatbots, duplicateChatbot, createDefaultChatbot, deleteChatbot } from "@/features/chatbot/config/chatbotConfig";
+import { listChatbots, duplicateChatbot, createDefaultChatbot, deleteChatbot, updateChatbotStatus } from "@/features/chatbot/config/chatbotConfig";
 
 export async function GET() {
   try {
@@ -66,6 +66,29 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("[API /bots DELETE] Error:", error);
+    return NextResponse.json(
+      { success: false, error: error instanceof Error ? error.message : "Unknown error" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { botId, status } = body;
+
+    if (!botId || !status || !["active", "draft"].includes(status)) {
+      return NextResponse.json(
+        { success: false, error: "botId and status (active|draft) required" },
+        { status: 400 }
+      );
+    }
+
+    const updated = await updateChatbotStatus(botId, status);
+    return NextResponse.json({ success: true, data: updated });
+  } catch (error) {
+    console.error("[API /bots PATCH] Error:", error);
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 }

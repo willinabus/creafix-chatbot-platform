@@ -256,6 +256,19 @@ export async function deleteChatbot(botId: string) {
   }
 }
 
+export async function updateChatbotStatus(botId: string, status: "active" | "draft") {
+  try {
+    const updated = await prisma.chatbotConfig.update({
+      where: { id: botId },
+      data: { status },
+    });
+    return updated;
+  } catch (error) {
+    console.error("[updateChatbotStatus] Error:", error);
+    throw error;
+  }
+}
+
 export async function createDefaultChatbot(name: string, companyName: string) {
   const id = `bot-${Date.now()}`;
   const d = defaultChatbotConfig;
