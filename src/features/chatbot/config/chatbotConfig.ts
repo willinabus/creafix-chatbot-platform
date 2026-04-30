@@ -215,6 +215,21 @@ export async function listChatbots() {
   }
 }
 
+function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+function generateBotId(name: string, companyName: string): string {
+  const base = slugify(`${companyName}-${name}`);
+  const suffix = Date.now().toString(36).slice(-4);
+  return `${base}-${suffix}`;
+}
+
 export async function duplicateChatbot(originalId: string, newName?: string) {
   try {
     const original = await prisma.chatbotConfig.findUnique({
@@ -223,15 +238,17 @@ export async function duplicateChatbot(originalId: string, newName?: string) {
 
     if (!original) throw new Error("Original bot not found");
 
-    const newId = `${originalId}-copy-${Date.now()}`;
+    const botName = newName || original.name;
+    const botCompany = original.companyName;
+    const newId = generateBotId(botName, botCompany);
     const { id, createdAt, updatedAt, ...data } = original;
 
     const newBot = await prisma.chatbotConfig.create({
       data: {
         ...data,
         id: newId,
-        name: newName || `${original.name} (copie)`,
-        companyName: `${original.companyName} (copie)`,
+        name: `${botName} (copie)`,
+        companyName: `${botCompany} (copie)`,
         status: "draft",
         embedEnabled: false,
       },
@@ -270,7 +287,7 @@ export async function updateChatbotStatus(botId: string, status: "active" | "dra
 }
 
 export async function createDefaultChatbot(name: string, companyName: string) {
-  const id = `bot-${Date.now()}`;
+  const id = generateBotId(name, companyName);
   const d = defaultChatbotConfig;
   try {
     return await prisma.chatbotConfig.create({
