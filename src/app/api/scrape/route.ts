@@ -1,51 +1,43 @@
 /**
  * Scrape API Route
- * Scrapes a website URL and generates a chatbot config using OpenAI
- * Admin-only feature for rapid client onboarding
+ * Uses Firecrawl to extract structured data + branding from a website,
+ * then OpenAI to generate a complete chatbot config.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { createChatCompletion, isOpenAIConfigured } from "@/lib/openai";
 
-function extractTextFromHTML(html: string, url: string): string {
-  // Remove script and style tags
-  const clean = html
-    .replace(/<script[\s\S]*?<\/script>/gi, "")
-    .replace(/<style[\s\S]*?<\/style>/gi, "");
+const FIRECRAWL_API_KEY = process.env.FIRECRAWL_API_KEY;
+const FIRECRAWL_API_URL = "https://api.firecrawl.dev/v2/scrape";
 
-  // Extract title
-  const titleMatch = clean.match(/<title[^>]*>(.*?)<\/title>/i);
-  const title = titleMatch ? titleMatch[1].trim() : "";
-
-  // Extract meta description
-  const metaDescMatch = clean.match(
-    /<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i
-  );
-  const metaDesc = metaDescMatch ? metaDescMatch[1].trim() : "";
-
-  // Extract h1, h2, h3
-  const headings: string[] = [];
-  const headingMatches = clean.matchAll(/<(h1|h2|h3)[^>]*>([\s\S]*?)<\/\1>/gi);
-  for (const match of headingMatches) {
-    const text = match[2].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-    if (text.length > 3) headings.push(text);
+async function scrapeWithFirecrawl(url: string) {
+  if (!FIRECRAWL_API_KEY) {
+    throw new Error("FIRECRAWL_API_KEY not configured");
   }
 
-  // Extract paragraphs
-  const paragraphs: string[] = [];
-  const pMatches = clean.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi);
-  for (const match of pMatches) {
-    const text = match[1].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-    if (text.length > 20 && text.length < 500) paragraphs.push(text);
+  const res = await fetch(FIRECRAWL_API_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${FIRECRAWL_API_KEY}`,
+    },
+    body: JSON.stringify({
+      url,
+      formats: ["markdown", "branding", "images"],
+      maxAge: 0,
+    }),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Firecrawl error ${res.status}: ${errText}`);
   }
 
-  return [
-    `URL: ${url}`,
-    `Title: ${title}`,
-    `Meta Description: ${metaDesc}`,
-    `Headings:\n${headings.slice(0, 15).join("\n")}`,
-    `Paragraphs:\n${paragraphs.slice(0, 20).join("\n")}`,
-  ].join("\n\n");
+  const json = await res.json();
+  if (!json.success) {
+    throw new Error(json.error || "Firecrawl scrape failed");
+  }
+  return json.data;
 }
 
 export async function POST(request: NextRequest) {
@@ -67,85 +59,127 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Fetch the website with manual timeout (AbortSignal.timeout not always available)
-    const fetchWithTimeout = (targetUrl: string, ms: number) =>
-      Promise.race([
-        fetch(targetUrl, {
-          headers: {
-            "User-Agent": "Mozilla/5.0 (compatible; ChatbotScraper/1.0)",
-          },
-        }),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error(`Fetch timeout after ${ms}ms`)), ms)
-        ),
-      ]);
-
-    let response: Response;
+    // 1. Scrape with Firecrawl
+    let firecrawlData: any;
     try {
-      response = await fetchWithTimeout(url, 10000) as Response;
-    } catch (fetchErr) {
-      console.error("[API /scrape] Fetch failed:", fetchErr);
-      return NextResponse.json(
-        { success: false, error: `Impossible d'accéder à l'URL : ${fetchErr instanceof Error ? fetchErr.message : "erreur réseau"}` },
-        { status: 502 }
-      );
+      firecrawlData = await scrapeWithFirecrawl(url);
+      console.log("[Scrape] Firecrawl branding:", JSON.stringify(firecrawlData.branding || {}, null, 2).slice(0, 800));
+    } catch (firecrawlErr) {
+      console.warn("[Scrape] Firecrawl failed, falling back to basic fetch:", firecrawlErr);
+      // Fallback: basic fetch
+      const response = await fetch(url, {
+        headers: { "User-Agent": "Mozilla/5.0" },
+      });
+      const html = await response.text();
+      const titleMatch = html.match(/<title[^>]*>(.*?)<\/title>/i);
+      const metaDescMatch = html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i);
+      const hMatches = Array.from(html.matchAll(/<(h1|h2)[^>]*>([\s\S]*?)<\/\1>/gi));
+      const headings = hMatches.map((m) => m[2].replace(/<[^>]+>/g, " ").trim()).filter((t) => t.length > 3).slice(0, 10);
+      const pMatches = Array.from(html.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi));
+      const paragraphs = pMatches.map((m) => m[1].replace(/<[^>]+>/g, " ").trim()).filter((t) => t.length > 20).slice(0, 15);
+
+      firecrawlData = {
+        markdown: [
+          `Title: ${titleMatch ? titleMatch[1] : ""}`,
+          `Description: ${metaDescMatch ? metaDescMatch[1] : ""}`,
+          `Headings:\n${headings.join("\n")}`,
+          `Paragraphs:\n${paragraphs.join("\n")}`,
+        ].join("\n\n"),
+        branding: null,
+        images: [],
+      };
     }
 
-    if (!response.ok) {
-      return NextResponse.json(
-        { success: false, error: `Le site a répondu avec l'erreur ${response.status}` },
-        { status: 502 }
-      );
+    const markdown = firecrawlData.markdown || "";
+    const branding = firecrawlData.branding || {};
+    const images = firecrawlData.images || [];
+
+    // Extract logo from branding or images
+    let logoUrl: string | undefined;
+    if (branding.logo && branding.logo.startsWith("http")) {
+      logoUrl = branding.logo;
+    } else if (branding.images?.logo && branding.images.logo.startsWith("http")) {
+      logoUrl = branding.images.logo;
+    } else if (images.length > 0 && images[0].startsWith("http")) {
+      logoUrl = images[0];
     }
 
-    const html = await response.text();
-    console.log(`[API /scrape] Fetched ${html.length} chars from ${url}`);
+    // Extract colors from branding
+    const colors = branding.colors || {};
+    const styleFromBranding = {
+      primaryColor: colors.primary || undefined,
+      secondaryColor: colors.secondary || undefined,
+      accentColor: colors.accent || undefined,
+      widgetBgColor: colors.background || undefined,
+      textColor: colors.textPrimary || undefined,
+      buttonColor: colors.primary || undefined,
+      borderColor: colors.textSecondary ? `${colors.textSecondary}20` : undefined,
+      headerColor: colors.background || undefined,
+      iconColor: colors.primary || undefined,
+    };
 
-    const extractedText = extractTextFromHTML(html, url);
-    console.log(`[API /scrape] Extracted ${extractedText.length} chars`);
+    // 2. Build rich prompt for OpenAI
+    const prompt = `Tu es un expert en configuration de chatbots conversationnels pour des entreprises locales (salons, restaurants, commerces, cabinets médicaux, etc.).
 
-    if (extractedText.length < 100) {
-      return NextResponse.json(
-        { success: false, error: "Le contenu du site est trop court pour générer une configuration. Essayez une autre URL (page d'accueil ou page principale)." },
-        { status: 422 }
-      );
-    }
+À partir du contenu du site web ci-dessous, génère une configuration JSON COMPLÈTE pour un chatbot conversationnel.
 
-    // Build prompt for OpenAI
-    const prompt = `Tu es un assistant spécialisé dans la configuration de chatbots pour des entreprises locales (salons, restaurants, commerces, etc.).
-
-À partir du contenu du site web ci-dessous, génère une configuration JSON pour un chatbot conversationnel.
-
-CONTENU DU SITE :
+CONTENU DU SITE (Markdown extrait) :
 ---
-${extractedText.slice(0, 8000)}
+${markdown.slice(0, 12000)}
 ---
+
+COULEURS DU SITE :
+${JSON.stringify(colors, null, 2)}
+
+LOGO DU SITE : ${logoUrl || "non détecté"}
 
 Génère UNIQUEMENT un objet JSON valide avec cette structure exacte (en français) :
 
 {
-  "name": "Nom du chatbot (prénom féminin ou masculin approprié)",
+  "name": "Prénom du chatbot (approprié au type d'entreprise, ex: Sophie pour un salon, Marco pour un restaurant)",
   "companyName": "Nom exact de l'entreprise",
   "tagline": "Slogan court et accrocheur (max 60 caractères)",
-  "welcomeMessage": "Message d'accueil chaleureux et personnalisé (2-3 phrases max)",
-  "inputPlaceholder": "Texte placeholder pour l'input (ex: 'Écrivez votre message...')",
-  "hours": "Horaires d'ouverture résumés (ex: Mar-Ven 9h-18h, Sam 9h-16h)",
-  "address": "Adresse complète si trouvée",
-  "contact": "Téléphone et/ou email si trouvé",
+  "welcomeMessage": "Message d'accueil chaleureux et personnalisé. 2-3 phrases max. Mentionne le nom de l'entreprise et le nom du chatbot. Invite à prendre rendez-vous ou poser une question.",
+  "inputPlaceholder": "Écrivez votre message...",
+  "hours": "Horaires résumés (ex: Mar-Ven 9h-18h, Sam 9h-16h)",
+  "address": "Adresse complète",
+  "contact": "Téléphone et/ou email",
   "services": [
-    { "name": "Nom du service", "description": "Description courte", "price": "Prix ou 'Sur devis'" }
+    { "name": "Nom du service", "description": "Description courte 1 phrase", "price": "Prix ou 'Sur devis'" }
   ],
   "faq": [
-    { "question": "Question fréquente", "answer": "Réponse concise" }
+    { "question": "Question fréquente que les clients posent", "answer": "Réponse concise et utile" }
   ],
-  "systemPrompt": "Prompt système complet et détaillé pour guider le chatbot. Inclure: rôle, ton, règles, services, horaires, adresse, contact, processus de prise de rendez-vous."
+  "quickReplies": [
+    { "id": "faq", "label": "Poser une question", "action": "show_faq", "payload": {} },
+    { "id": "services", "label": "Voir les services", "action": "show_services", "payload": {} },
+    { "id": "booking", "label": "Prendre rendez-vous", "action": "start_booking", "payload": {} },
+    { "id": "hours", "label": "Horaires & adresse", "action": "show_info", "payload": {} }
+  ],
+  "systemPrompt": "Prompt système COMPLET et DÉTAILLÉ. Doit suivre EXACTEMENT cette structure :\n\nTu es [NOM], l'assistante digitale de [ENTREPRISE].\n\nTon rôle :\n- Accueillir les clients avec chaleur et professionnalisme\n- Répondre aux questions sur les services, les tarifs, les horaires\n- Aider à prendre rendez-vous en collectant les informations nécessaires\n- Orienter vers un contact humain si besoin\n\nRègles STRICTES :\n- Sois concise, élégante, chaleureuse. Maximum 2-3 phrases par message.\n- Utilise un ton raffiné mais accessible.\n- Réponds en français.\n- Propose toujours des actions concrètes.\n- Pour les rendez-vous : collecte service → date → prénom → téléphone → créneau.\n- Quand tu proposes des créneaux, affiche UNIQUEMENT les créneaux DISPONIBLES. Ne mentionne JAMAIS les créneaux non disponibles ou occupés.\n- Si aucun créneau n'est disponible, dis simplement qu'il n'y a plus de place et propose une autre date.\n- Ne pose jamais deux questions en même message. Une question à la fois.\n- Pas de markdown, pas de listes numérotées, pas de texte en gras.\n\nServices principaux :\n[Liste des services avec prix]\n\nHoraires : [horaires]\nAdresse : [adresse]\nTéléphone : [contact]\n\nTu as accès à des outils pour vérifier les disponibilités et créer des rendez-vous.",
+  "logoUrl": "${logoUrl || ""}",
+  "style": {
+    "primaryColor": "couleur hex principale du site",
+    "secondaryColor": "couleur hex secondaire",
+    "accentColor": "couleur hex d'accent",
+    "widgetBgColor": "couleur hex de fond",
+    "textColor": "couleur hex de texte",
+    "userBubbleColor": "#0c0b09",
+    "botBubbleColor": "couleur hex claire proche du fond",
+    "buttonColor": "couleur hex principale",
+    "borderColor": "couleur hex bordure légère",
+    "headerColor": "couleur hex de fond",
+    "iconColor": "couleur hex principale"
+  }
 }
 
-RÈGLES :
-- Si tu ne trouves pas certaines infos (prix, horaires détaillés), invente des valeurs plausibles ou mets des placeholders.
-- Le tone doit être chaleureux, professionnel et concis.
-- Le chatbot doit orienter vers la prise de rendez-vous ou la réservation.
-- Réponds UNIQUEMENT avec le JSON, sans markdown, sans explication.`;
+RÈGLES IMPORTANTES :
+1. Le systemPrompt DOIT être long, détaillé, et suivre EXACTEMENT la structure ci-dessus avec toutes les sections (Ton rôle, Règles STRICTES, Services principaux, Horaires, Adresse, Téléphone).
+2. Génère au moins 4 services réels trouvés sur le site. Si aucun prix n'est visible, mets "Sur devis".
+3. Génère au moins 4 FAQ pertinentes pour ce type d'entreprise.
+4. Les quickReplies DOIVENT être exactement les 4 fournies ci-dessus avec les mêmes id/action.
+5. Pour les couleurs, utilise les couleurs du site si elles sont pertinentes, sinon des couleurs élégantes adaptées au secteur.
+6. Réponds UNIQUEMENT avec le JSON valide, sans markdown, sans explication.`;
 
     let completion;
     try {
@@ -176,7 +210,7 @@ RÈGLES :
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     const jsonStr = jsonMatch ? jsonMatch[0] : raw;
 
-    let generated;
+    let generated: any;
     try {
       generated = JSON.parse(jsonStr);
     } catch (parseErr) {
@@ -185,6 +219,19 @@ RÈGLES :
         { success: false, error: "L'IA n'a pas retourné un JSON valide. Réessayez avec une autre URL." },
         { status: 422 }
       );
+    }
+
+    // Merge Firecrawl branding colors into style if OpenAI didn't provide them
+    if (!generated.style) generated.style = {};
+    for (const [key, val] of Object.entries(styleFromBranding)) {
+      if (!generated.style[key] && val) {
+        generated.style[key] = val;
+      }
+    }
+
+    // Ensure logoUrl is set
+    if (!generated.logoUrl && logoUrl) {
+      generated.logoUrl = logoUrl;
     }
 
     return NextResponse.json({

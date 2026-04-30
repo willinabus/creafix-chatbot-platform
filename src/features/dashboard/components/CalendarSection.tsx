@@ -9,28 +9,26 @@ import { useEffect, useState } from "react";
 import { Calendar, AlertCircle, CheckCircle, Link2, Copy, ExternalLink } from "lucide-react";
 
 interface CalendarSectionProps {
-  provider: string;
   botId: string;
-  onChange: (provider: string) => void;
 }
 
-export function CalendarSection({ provider, botId, onChange }: CalendarSectionProps) {
+export function CalendarSection({ botId }: CalendarSectionProps) {
   const [googleConfigured, setGoogleConfigured] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [authUrl, setAuthUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    fetch("/api/status")
+    fetch(`/api/status?botId=${botId}`)
       .then((r) => r.json())
       .then((data) => {
         if (data.success) {
           setGoogleConfigured(data.data.googleCalendar || data.data.hasDynamicToken);
         }
-        setLoading(false);
       })
-      .catch(() => setLoading(false));
-  }, []);
+      .catch(() => {
+        // ignore
+      });
+  }, [botId]);
 
   const generateAuthLink = async () => {
     const res = await fetch(`/api/auth/google-calendar?botId=${botId}`);
@@ -47,8 +45,6 @@ export function CalendarSection({ provider, botId, onChange }: CalendarSectionPr
       setTimeout(() => setCopied(false), 2000);
     }
   };
-
-  const activeProvider = provider;
 
   return (
     <div className="space-y-6">
@@ -275,77 +271,22 @@ export function CalendarSection({ provider, botId, onChange }: CalendarSectionPr
         </div>
       </div>
 
-      {/* Provider selection */}
+      {/* Provider info */}
       <div className="space-y-4">
-        <h3
-          style={{
-            fontFamily: "'Space Mono', monospace",
-            fontSize: "12px",
-            textTransform: "uppercase",
-            letterSpacing: "0.06em",
-            color: "rgba(0,0,0,0.58)",
-            marginBottom: "12px",
-          }}
-        >
-          Mode de fonctionnement
-        </h3>
-
         <div
-          className={`p-4 border cursor-pointer transition-colors ${
-            activeProvider === "mock" ? "border-[#3898EC] bg-[rgba(56,152,236,0.03)]" : "border-[#E0E0E0]"
-          }`}
-          style={{ borderRadius: "2px" }}
-          onClick={() => onChange("mock")}
+          className="p-4 border border-[#E0E0E0]"
+          style={{ borderRadius: "2px", background: "rgba(0,0,0,0.02)" }}
         >
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-3">
-              <Calendar size={20} color={activeProvider === "mock" ? "#3898EC" : "rgba(0,0,0,0.42)"} />
-              <div>
-                <div style={{ fontFamily: "'Space Mono', monospace", fontSize: "14px", fontWeight: 700 }}>
-                  Mode Démo (Mock)
-                </div>
-                <div style={{ fontFamily: "'Space Mono', monospace", fontSize: "12px", color: "rgba(0,0,0,0.52)", marginTop: "2px" }}>
-                  Créneaux simulés pour la démonstration.
-                </div>
+          <div className="flex items-center gap-3">
+            <Calendar size={20} color="#3898EC" />
+            <div>
+              <div style={{ fontFamily: "'Space Mono', monospace", fontSize: "14px", fontWeight: 700 }}>
+                Google Calendar
+              </div>
+              <div style={{ fontFamily: "'Space Mono', monospace", fontSize: "12px", color: "rgba(0,0,0,0.52)", marginTop: "2px" }}>
+                Le chatbot utilise Google Calendar pour vérifier les disponibilités et créer des rendez-vous.
               </div>
             </div>
-            {activeProvider === "mock" && <CheckCircle size={18} color="#3898EC" />}
-          </div>
-        </div>
-
-        <div
-          className={`p-4 border cursor-pointer transition-colors ${
-            activeProvider === "google_mcp"
-              ? "border-[#3898EC] bg-[rgba(56,152,236,0.03)]"
-              : "border-[#E0E0E0] hover:border-[#22C55E]"
-          }`}
-          style={{ borderRadius: "2px" }}
-          onClick={() => onChange("google_mcp")}
-        >
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-3">
-              <Calendar
-                size={20}
-                color={
-                  activeProvider === "google_mcp"
-                    ? "#3898EC"
-                    : googleConfigured
-                      ? "#22C55E"
-                      : "rgba(0,0,0,0.42)"
-                }
-              />
-              <div>
-                <div style={{ fontFamily: "'Space Mono', monospace", fontSize: "14px", fontWeight: 700 }}>
-                  Google Calendar (Production)
-                </div>
-                <div style={{ fontFamily: "'Space Mono', monospace", fontSize: "12px", color: "rgba(0,0,0,0.52)", marginTop: "2px" }}>
-                  {googleConfigured
-                    ? "✅ Connecté — cliquez pour activer"
-                    : "⏳ En attente de connexion par le client"}
-                </div>
-              </div>
-            </div>
-            {activeProvider === "google_mcp" && <CheckCircle size={18} color="#3898EC" />}
           </div>
         </div>
       </div>

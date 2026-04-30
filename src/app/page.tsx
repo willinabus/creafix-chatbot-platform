@@ -199,6 +199,12 @@ export default function DashboardPage() {
           tagline: generated.tagline || config.branding.tagline,
           welcomeMessage: generated.welcomeMessage || config.branding.welcomeMessage,
           inputPlaceholder: generated.inputPlaceholder || config.branding.inputPlaceholder,
+          logoUrl: generated.logoUrl || config.branding.logoUrl,
+          avatarUrl: generated.logoUrl || config.branding.avatarUrl,
+        },
+        style: {
+          ...config.style,
+          ...(generated.style || {}),
         },
         content: {
           ...config.content,
@@ -207,6 +213,7 @@ export default function DashboardPage() {
           contact: generated.contact || config.content.contact,
           services: generated.services || config.content.services,
           faq: generated.faq || config.content.faq,
+          quickReplies: generated.quickReplies || config.content.quickReplies,
         },
         systemPrompt: generated.systemPrompt || config.systemPrompt,
       };
@@ -336,11 +343,7 @@ export default function DashboardPage() {
         );
       case "calendar":
         return (
-          <CalendarSection
-            provider={config.calendarProvider}
-            botId={config.id}
-            onChange={(provider) => setConfig((p) => ({ ...p, calendarProvider: provider }))}
-          />
+          <CalendarSection botId={config.id} />
         );
       case "embed":
         return (
