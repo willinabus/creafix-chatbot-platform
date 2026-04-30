@@ -15,14 +15,16 @@ interface QuickRepliesProps {
   disabled?: boolean;
   buttonColor?: string;
   buttonRadius?: string;
+  fontFamily?: string;
 }
 
-export function QuickReplies({ replies, onSelect, disabled, buttonColor, buttonRadius }: QuickRepliesProps) {
+export function QuickReplies({ replies, onSelect, disabled, buttonColor, buttonRadius, fontFamily }: QuickRepliesProps) {
   if (!replies || replies.length === 0) return null;
 
   const bg = buttonColor || "#0c0b09";
   const radius = buttonRadius || "4px";
   const textColor = getContrastText(bg);
+  const font = fontFamily || "'Space Mono', 'Courier New', monospace";
   // Hover: slightly lighter or darker
   const hoverBg = textColor === "#F5F3EE" ? "#2a2825" : "#e0ded9";
 
@@ -45,7 +47,7 @@ export function QuickReplies({ replies, onSelect, disabled, buttonColor, buttonR
           style={{
             padding: "10px 18px",
             fontSize: "13px",
-            fontFamily: "'Space Mono', 'Courier New', monospace",
+            fontFamily: font,
             background: bg,
             border: `1px solid ${bg}`,
             borderRadius: radius,

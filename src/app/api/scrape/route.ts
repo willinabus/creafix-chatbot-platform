@@ -285,7 +285,7 @@ LOGO DU SITE : ${logoUrl || "non détecté"}
 Génère UNIQUEMENT un objet JSON valide avec cette structure exacte (en français) :
 
 {
-  "name": "Prénom du chatbot (approprié au type d'entreprise, ex: Sophie pour un salon, Marco pour un restaurant)",
+  "name": "Prénom du chatbot — invente un prénom original et approprié au type d'entreprise. Ne réutilise jamais systématiquement le même prénom.",
   "companyName": "Nom exact de l'entreprise",
   "tagline": "Slogan court et accrocheur (max 60 caractères)",
   "welcomeMessage": "Message d'accueil chaleureux et personnalisé. 2-3 phrases max. Mentionne le nom de l'entreprise et le nom du chatbot. Invite à prendre rendez-vous ou poser une question.",

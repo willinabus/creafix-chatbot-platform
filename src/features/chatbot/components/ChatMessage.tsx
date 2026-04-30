@@ -89,6 +89,7 @@ export function ChatMessage({ message, onQuickReply, isLoading, style }: ChatMes
             disabled={isLoading}
             buttonColor={buttonColor}
             buttonRadius={buttonRadius}
+            fontFamily={fontFamily}
           />
         )}
       </div>
