@@ -16,14 +16,16 @@ interface ChatHeaderProps {
   iconColor?: string;
   buttonColor?: string;
   primaryColor?: string;
+  fontFamily?: string;
 }
 
-export function ChatHeader({ title, subtitle, onClose, onMinimize, headerColor, textColor, iconColor, buttonColor, primaryColor }: ChatHeaderProps) {
+export function ChatHeader({ title, subtitle, onClose, onMinimize, headerColor, textColor, iconColor, buttonColor, primaryColor, fontFamily }: ChatHeaderProps) {
   const headerBg = headerColor || "#FCFBF8";
   const txtColor = textColor || "#111111";
   const icnColor = iconColor || "rgba(17,17,17,0.42)";
   const btnColor = buttonColor || "#0c0b09";
   const avatarTextColor = getContrastText(btnColor);
+  const font = fontFamily || "Georgia, 'Times New Roman', serif";
 
   return (
     <div
@@ -43,7 +45,7 @@ export function ChatHeader({ title, subtitle, onClose, onMinimize, headerColor, 
             borderRadius: "4px",
             background: btnColor,
             color: avatarTextColor,
-            fontFamily: "Georgia, serif",
+            fontFamily: font,
             fontSize: "14px",
             fontWeight: 400,
             letterSpacing: "0.05em",
@@ -54,7 +56,7 @@ export function ChatHeader({ title, subtitle, onClose, onMinimize, headerColor, 
         <div>
           <h3
             style={{
-              fontFamily: "Georgia, 'Times New Roman', serif",
+              fontFamily: font,
               fontSize: "16px",
               fontWeight: 400,
               color: txtColor,
@@ -67,7 +69,7 @@ export function ChatHeader({ title, subtitle, onClose, onMinimize, headerColor, 
           {subtitle && (
             <p
               style={{
-                fontFamily: "'Space Mono', monospace",
+                fontFamily: font,
                 fontSize: "11px",
                 color: icnColor,
                 lineHeight: 1.3,

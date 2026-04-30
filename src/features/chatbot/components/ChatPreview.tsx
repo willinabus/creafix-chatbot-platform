@@ -139,6 +139,7 @@ export function ChatPreview({ config: propConfig }: ChatPreviewProps) {
         iconColor={config.style.iconColor}
         buttonColor={config.style.buttonColor}
         primaryColor={config.style.primaryColor}
+        fontFamily={config.style.fontFamily}
       />
       <div
         className="flex-1 overflow-y-auto"
