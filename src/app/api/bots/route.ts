@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { listChatbots, duplicateChatbot, createDefaultChatbot } from "@/features/chatbot/config/chatbotConfig";
+import { listChatbots, duplicateChatbot, createDefaultChatbot, deleteChatbot } from "@/features/chatbot/config/chatbotConfig";
 
 export async function GET() {
   try {
@@ -43,6 +43,29 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     console.error("[API /bots] Error:", error);
+    return NextResponse.json(
+      { success: false, error: error instanceof Error ? error.message : "Unknown error" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const botId = searchParams.get("botId");
+
+    if (!botId) {
+      return NextResponse.json(
+        { success: false, error: "botId is required" },
+        { status: 400 }
+      );
+    }
+
+    await deleteChatbot(botId);
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("[API /bots DELETE] Error:", error);
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 }

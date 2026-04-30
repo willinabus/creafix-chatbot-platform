@@ -244,6 +244,18 @@ export async function duplicateChatbot(originalId: string, newName?: string) {
   }
 }
 
+export async function deleteChatbot(botId: string) {
+  try {
+    await prisma.chatbotConfig.delete({
+      where: { id: botId },
+    });
+    return true;
+  } catch (error) {
+    console.error("[deleteChatbot] Error:", error);
+    throw error;
+  }
+}
+
 export async function createDefaultChatbot(name: string, companyName: string) {
   const id = `bot-${Date.now()}`;
   const d = defaultChatbotConfig;

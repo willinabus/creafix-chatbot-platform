@@ -149,6 +149,22 @@ export default function DashboardPage() {
     }
   };
 
+  const handleDeleteBot = async (botId: string) => {
+    try {
+      const res = await fetch(`/api/bots?botId=${encodeURIComponent(botId)}`, { method: "DELETE" });
+      const data = await res.json();
+      if (data.success) {
+        setBots((prev) => prev.filter((b) => b.id !== botId));
+        setSaveMessage("Chatbot supprimé");
+        setTimeout(() => setSaveMessage(""), 3000);
+      } else {
+        setSaveMessage(`Erreur: ${data.error}`);
+      }
+    } catch {
+      setSaveMessage("Erreur réseau");
+    }
+  };
+
   const handleCreateBot = async () => {
     try {
       const res = await fetch("/api/bots", {
@@ -190,32 +206,34 @@ export default function DashboardPage() {
 
       const generated = scrapeData.data;
 
+      // Overwrite everything with generated data, keeping current bot id
       const updatedConfig = {
-        ...config,
+        ...defaultChatbotConfig,
+        id: config.id,
         branding: {
-          ...config.branding,
-          name: generated.name || config.branding.name,
-          companyName: generated.companyName || config.branding.companyName,
-          tagline: generated.tagline || config.branding.tagline,
-          welcomeMessage: generated.welcomeMessage || config.branding.welcomeMessage,
-          inputPlaceholder: generated.inputPlaceholder || config.branding.inputPlaceholder,
-          logoUrl: generated.logoUrl || config.branding.logoUrl,
-          avatarUrl: generated.logoUrl || config.branding.avatarUrl,
+          ...defaultChatbotConfig.branding,
+          name: generated.name || defaultChatbotConfig.branding.name,
+          companyName: generated.companyName || defaultChatbotConfig.branding.companyName,
+          tagline: generated.tagline || defaultChatbotConfig.branding.tagline,
+          welcomeMessage: generated.welcomeMessage || defaultChatbotConfig.branding.welcomeMessage,
+          inputPlaceholder: generated.inputPlaceholder || defaultChatbotConfig.branding.inputPlaceholder,
+          logoUrl: generated.logoUrl || defaultChatbotConfig.branding.logoUrl,
+          avatarUrl: generated.logoUrl || defaultChatbotConfig.branding.avatarUrl,
         },
         style: {
-          ...config.style,
+          ...defaultChatbotConfig.style,
           ...(generated.style || {}),
         },
         content: {
-          ...config.content,
-          hours: generated.hours || config.content.hours,
-          address: generated.address || config.content.address,
-          contact: generated.contact || config.content.contact,
-          services: generated.services || config.content.services,
-          faq: generated.faq || config.content.faq,
-          quickReplies: generated.quickReplies || config.content.quickReplies,
+          ...defaultChatbotConfig.content,
+          hours: generated.hours || defaultChatbotConfig.content.hours,
+          address: generated.address || defaultChatbotConfig.content.address,
+          contact: generated.contact || defaultChatbotConfig.content.contact,
+          services: generated.services || defaultChatbotConfig.content.services,
+          faq: generated.faq || defaultChatbotConfig.content.faq,
+          quickReplies: generated.quickReplies || defaultChatbotConfig.content.quickReplies,
         },
-        systemPrompt: generated.systemPrompt || config.systemPrompt,
+        systemPrompt: generated.systemPrompt || defaultChatbotConfig.systemPrompt,
       };
 
       setConfig(updatedConfig);
@@ -449,6 +467,7 @@ export default function DashboardPage() {
               bots={bots}
               onSelectBot={handleSelectBot}
               onDuplicateBot={handleDuplicateBot}
+              onDeleteBot={handleDeleteBot}
               onCreateBot={handleCreateBot}
               isLoading={isLoadingBots}
             />

@@ -5,7 +5,7 @@
 
 "use client";
 
-import { Bot, Plus, Copy, ArrowRight } from "lucide-react";
+import { Bot, Plus, Copy, ArrowRight, Trash2 } from "lucide-react";
 
 interface Bot {
   id: string;
@@ -19,11 +19,12 @@ interface BotSelectorProps {
   bots: Bot[];
   onSelectBot: (botId: string) => void;
   onDuplicateBot: (botId: string) => void;
+  onDeleteBot: (botId: string) => void;
   onCreateBot: () => void;
   isLoading?: boolean;
 }
 
-export function BotSelector({ bots, onSelectBot, onDuplicateBot, onCreateBot, isLoading }: BotSelectorProps) {
+export function BotSelector({ bots, onSelectBot, onDuplicateBot, onDeleteBot, onCreateBot, isLoading }: BotSelectorProps) {
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
@@ -189,6 +190,26 @@ export function BotSelector({ bots, onSelectBot, onDuplicateBot, onCreateBot, is
               >
                 <Copy size={12} />
                 Dupliquer
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (confirm(`Supprimer définitivement "${bot.name}" ? Cette action est irréversible.`)) {
+                    onDeleteBot(bot.id);
+                  }
+                }}
+                className="flex items-center gap-1.5 px-3 py-2 border border-[#E0E0E0] hover:border-[#ef4444] hover:text-[#ef4444] transition-colors"
+                style={{
+                  fontFamily: "'Space Mono', monospace",
+                  fontSize: "12px",
+                  borderRadius: "2px",
+                  background: "white",
+                  cursor: "pointer",
+                  color: "rgba(0,0,0,0.52)",
+                }}
+                title="Supprimer ce chatbot"
+              >
+                <Trash2 size={12} />
               </button>
             </div>
           </div>
