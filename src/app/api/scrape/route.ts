@@ -11,131 +11,146 @@ import { createChatCompletion, isOpenAIConfigured } from "@/lib/openai";
  * Color coherence helpers
  * Ensures imported colors have sufficient contrast and no black-on-black
  */
-function hexToRgb(hex: string) {
-  const clean = hex.replace("#", "");
-  const bigint = parseInt(clean.length === 3 ? clean.split("").map((c) => c + c).join("") : clean, 16);
-  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+
+function parseAnyColor(c: string): { r: number; g: number; b: number } | null {
+  if (!c) return null;
+  c = c.trim().toLowerCase();
+  // Hex
+  if (c.startsWith("#")) {
+    const clean = c.replace("#", "");
+    const full = clean.length === 3 ? clean.split("").map((x) => x + x).join("") : clean;
+    const bigint = parseInt(full, 16);
+    if (isNaN(bigint)) return null;
+    return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+  }
+  // rgb/rgba
+  const rgbMatch = c.match(/rgba?\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+  if (rgbMatch) {
+    return { r: parseInt(rgbMatch[1]), g: parseInt(rgbMatch[2]), b: parseInt(rgbMatch[3]) };
+  }
+  // Named colors (basic)
+  const named: Record<string, string> = {
+    black: "#000000", white: "#ffffff", red: "#ff0000", green: "#008000",
+    blue: "#0000ff", yellow: "#ffff00", cyan: "#00ffff", magenta: "#ff00ff",
+    silver: "#c0c0c0", gray: "#808080", grey: "#808080", orange: "#ffa500",
+    purple: "#800080", brown: "#a52a2a", pink: "#ffc0cb", navy: "#000080",
+    teal: "#008080", olive: "#808000", maroon: "#800000", lime: "#00ff00",
+  };
+  if (named[c]) return parseAnyColor(named[c]);
+  return null;
 }
 
-function luminance({ r, g, b }: { r: number; g: number; b: number }) {
-  const a = [r, g, b].map((v) => {
+function rgbToHex({ r, g, b }: { r: number; g: number; b: number }) {
+  const toHex = (n: number) => Math.max(0, Math.min(255, n)).toString(16).padStart(2, "0");
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+
+function luminance(rgb: { r: number; g: number; b: number }) {
+  const a = [rgb.r, rgb.g, rgb.b].map((v) => {
     v /= 255;
     return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
   });
   return a[0] * 0.2126 + a[1] * 0.7152 + a[2] * 0.0722;
 }
 
-function contrastRatio(hex1: string, hex2: string) {
-  const l1 = luminance(hexToRgb(hex1)) + 0.05;
-  const l2 = luminance(hexToRgb(hex2)) + 0.05;
+function isDarkColor(rgb: { r: number; g: number; b: number }) {
+  return luminance(rgb) < 0.4;
+}
+
+function contrastRatioRgb(a: { r: number; g: number; b: number }, b: { r: number; g: number; b: number }) {
+  const l1 = luminance(a) + 0.05;
+  const l2 = luminance(b) + 0.05;
   return l1 > l2 ? l1 / l2 : l2 / l1;
 }
 
-function isDark(hex: string) {
-  return luminance(hexToRgb(hex)) < 0.5;
+function lightenRgb(rgb: { r: number; g: number; b: number }, amount: number) {
+  return {
+    r: Math.min(255, Math.round(rgb.r + (255 - rgb.r) * amount)),
+    g: Math.min(255, Math.round(rgb.g + (255 - rgb.g) * amount)),
+    b: Math.min(255, Math.round(rgb.b + (255 - rgb.b) * amount)),
+  };
 }
 
-function lighten(hex: string, amount: number) {
-  const { r, g, b } = hexToRgb(hex);
-  const f = (c: number) => Math.min(255, Math.round(c + (255 - c) * amount));
-  const toHex = (n: number) => n.toString(16).padStart(2, "0");
-  return `#${toHex(f(r))}${toHex(f(g))}${toHex(f(b))}`;
+function darkenRgb(rgb: { r: number; g: number; b: number }, amount: number) {
+  return {
+    r: Math.max(0, Math.round(rgb.r * (1 - amount))),
+    g: Math.max(0, Math.round(rgb.g * (1 - amount))),
+    b: Math.max(0, Math.round(rgb.b * (1 - amount))),
+  };
 }
 
-function darken(hex: string, amount: number) {
-  const { r, g, b } = hexToRgb(hex);
-  const f = (c: number) => Math.max(0, Math.round(c * (1 - amount)));
-  const toHex = (n: number) => n.toString(16).padStart(2, "0");
-  return `#${toHex(f(r))}${toHex(f(g))}${toHex(f(b))}`;
-}
-
-function ensureColorCoherence(style: Record<string, string>) {
+/**
+ * Build a fully coherent theme from extracted colors.
+ * Strategy: detect if the site is dark or light, then build a readable chatbot theme.
+ */
+function buildCoherentTheme(style: Record<string, string>) {
   const s = { ...style };
 
-  // Ensure we have hex values
-  const ensureHex = (c?: string) => {
-    if (!c) return undefined;
-    if (c.startsWith("#")) return c;
-    if (c.startsWith("rgb")) return undefined;
-    if (/^[0-9A-Fa-f]{3,6}$/.test(c)) return `#${c}`;
-    return undefined;
+  // Normalize all colors to hex
+  const norm = (key: string) => {
+    const v = s[key];
+    if (!v) return;
+    const rgb = parseAnyColor(v);
+    if (rgb) s[key] = rgbToHex(rgb);
   };
+  ["primaryColor", "secondaryColor", "accentColor", "widgetBgColor", "textColor",
+   "userBubbleColor", "botBubbleColor", "buttonColor", "borderColor", "headerColor", "iconColor"].forEach(norm);
 
-  const fix = (key: string) => {
-    const v = ensureHex(s[key]);
-    if (v) s[key] = v;
-  };
-  ["primaryColor", "secondaryColor", "accentColor", "widgetBgColor", "textColor", "userBubbleColor", "botBubbleColor", "buttonColor", "borderColor", "headerColor", "iconColor"].forEach(fix);
+  // Extract the site's background color (from Firecrawl or generated)
+  const bgHex = s.widgetBgColor || "#FCFBF8";
+  const bgRgb = parseAnyColor(bgHex)!;
+  const bgIsDark = isDarkColor(bgRgb);
 
-  const bg = s.widgetBgColor || "#FCFBF8";
-  const bgDark = isDark(bg);
-  const bgLum = luminance(hexToRgb(bg));
+  // The site's brand color (primary)
+  const brandHex = s.primaryColor || s.accentColor || s.buttonColor || (bgIsDark ? "#F5F3EE" : "#111111");
+  const brandRgb = parseAnyColor(brandHex)!;
+  const brandIsDark = isDarkColor(brandRgb);
 
-  // === THEME-BASED COHERENCE ===
-  // If background is dark (< 0.35 luminance), force a LIGHT readable theme
-  // If background is light (>= 0.35), keep dark accents but ensure readability
+  // === BUILD THEME BASED ON SITE TONE ===
+  if (bgIsDark) {
+    // SITE IS DARK → build a DARK chatbot theme with HIGH contrast elements
+    // Background stays dark (brand feel), but ALL interactive/text elements are light
+    s.widgetBgColor = bgHex;
+    s.secondaryColor = rgbToHex(lightenRgb(bgRgb, 0.06));
+    s.headerColor = bgHex;
+    s.textColor = "#F5F3EE";                       // light text on dark
+    s.botBubbleColor = rgbToHex(lightenRgb(bgRgb, 0.12)); // slightly lighter than bg
+    s.userBubbleColor = "#F5F3EE";                 // light bubble, dark text
+    s.borderColor = "rgba(245,243,238,0.15)";      // light borders
+    s.iconColor = "#F5F3EE";
 
-  const LIGHT_TEXT = "#F5F3EE";
-  const DARK_TEXT = "#111111";
-
-  // 1. textColor MUST contrast with widgetBgColor
-  if (!s.textColor || contrastRatio(s.textColor, bg) < 3) {
-    s.textColor = bgDark ? LIGHT_TEXT : DARK_TEXT;
-  }
-
-  // 2. buttonColor MUST be visible on widgetBgColor
-  // If bg is dark, button MUST be light (not just "different")
-  if (!s.buttonColor || contrastRatio(s.buttonColor, bg) < 2.5) {
-    if (bgDark) {
-      s.buttonColor = LIGHT_TEXT;
+    // Button: if brand is light enough, use it. Otherwise force white.
+    if (!brandIsDark && contrastRatioRgb(brandRgb, bgRgb) >= 2.5) {
+      s.buttonColor = brandHex;
     } else {
-      s.buttonColor = s.primaryColor && isDark(s.primaryColor) ? s.primaryColor : DARK_TEXT;
+      s.buttonColor = "#F5F3EE";
     }
+    s.primaryColor = brandIsDark ? "#F5F3EE" : brandHex;
+    s.accentColor = s.primaryColor;
+  } else {
+    // SITE IS LIGHT → standard light theme
+    s.widgetBgColor = bgHex;
+    s.secondaryColor = rgbToHex(darkenRgb(bgRgb, 0.03));
+    s.headerColor = bgHex;
+    s.textColor = "#111111";
+    s.botBubbleColor = rgbToHex(darkenRgb(bgRgb, 0.04));
+    s.userBubbleColor = "#111111";                 // dark bubble, light text
+    s.borderColor = "rgba(17,17,17,0.10)";
+    s.iconColor = brandIsDark ? brandHex : "#111111";
+
+    // Button: if brand is dark enough, use it. Otherwise force dark.
+    if (brandIsDark && contrastRatioRgb(brandRgb, bgRgb) >= 2.5) {
+      s.buttonColor = brandHex;
+    } else {
+      s.buttonColor = "#111111";
+    }
+    s.primaryColor = brandIsDark ? brandHex : "#111111";
+    s.accentColor = s.primaryColor;
   }
 
-  // 3. botBubbleColor MUST be readable and distinct from bg
-  if (!s.botBubbleColor || contrastRatio(s.botBubbleColor, bg) < 1.15) {
-    s.botBubbleColor = bgDark ? lighten(bg, 0.12) : darken(bg, 0.04);
-  }
-  // Also ensure botBubbleColor is readable with textColor
-  if (contrastRatio(s.textColor, s.botBubbleColor) < 2.5) {
-    s.botBubbleColor = bgDark ? lighten(bg, 0.25) : darken(bg, 0.08);
-  }
-
-  // 4. userBubbleColor must contrast with widgetBgColor
-  // Text on user bubble auto-adapts in components, but we still need the bubble itself visible
-  if (!s.userBubbleColor || contrastRatio(s.userBubbleColor, bg) < 1.5) {
-    s.userBubbleColor = bgDark ? lighten(bg, 0.3) : DARK_TEXT;
-  }
-
-  // 5. borderColor must be visible
-  if (!s.borderColor || contrastRatio(s.borderColor, bg) < 1.1) {
-    s.borderColor = bgDark ? "rgba(245,243,238,0.18)" : "rgba(17,17,17,0.10)";
-  }
-
-  // 6. headerColor defaults to widgetBgColor, but ensure it's visible
-  if (!s.headerColor) {
-    s.headerColor = bg;
-  }
-
-  // 7. iconColor must be visible on header
-  if (!s.iconColor || contrastRatio(s.iconColor, s.headerColor) < 2) {
-    s.iconColor = bgDark ? LIGHT_TEXT : DARK_TEXT;
-  }
-
-  // 8. secondaryColor (message area bg) should be readable
-  if (!s.secondaryColor || contrastRatio(s.secondaryColor, bg) < 1.05) {
-    s.secondaryColor = bg;
-  }
-
-  // 9. Ensure accentColor is visible
-  if (!s.accentColor || contrastRatio(s.accentColor, bg) < 1.5) {
-    s.accentColor = bgDark ? LIGHT_TEXT : DARK_TEXT;
-  }
-
-  // 10. primaryColor fallback
-  if (!s.primaryColor) {
-    s.primaryColor = s.buttonColor;
+  // Ensure borderColor is valid hex or rgba string
+  if (!s.borderColor.includes("rgba") && parseAnyColor(s.borderColor)) {
+    s.borderColor = rgbToHex(parseAnyColor(s.borderColor)!);
   }
 
   return s;
@@ -293,17 +308,18 @@ Génère UNIQUEMENT un objet JSON valide avec cette structure exacte (en frança
   "systemPrompt": "Prompt système COMPLET et DÉTAILLÉ. Doit suivre EXACTEMENT cette structure :\n\nTu es [NOM], l'assistante digitale de [ENTREPRISE].\n\nTon rôle :\n- Accueillir les clients avec chaleur et professionnalisme\n- Répondre aux questions sur les services, les tarifs, les horaires\n- Aider à prendre rendez-vous en collectant les informations nécessaires\n- Orienter vers un contact humain si besoin\n\nRègles STRICTES :\n- Sois concise, élégante, chaleureuse. Maximum 2-3 phrases par message.\n- Utilise un ton raffiné mais accessible.\n- Réponds en français.\n- Propose toujours des actions concrètes.\n- Pour les rendez-vous : collecte service → date → prénom → téléphone → créneau.\n- Quand tu proposes des créneaux, affiche UNIQUEMENT les créneaux DISPONIBLES. Ne mentionne JAMAIS les créneaux non disponibles ou occupés.\n- Si aucun créneau n'est disponible, dis simplement qu'il n'y a plus de place et propose une autre date.\n- Ne pose jamais deux questions en même message. Une question à la fois.\n- Pas de markdown, pas de listes numérotées, pas de texte en gras.\n\nServices principaux :\n[Liste des services avec prix]\n\nHoraires : [horaires]\nAdresse : [adresse]\nTéléphone : [contact]\n\nTu as accès à des outils pour vérifier les disponibilités et créer des rendez-vous.",
   "logoUrl": "${logoUrl || ""}",
   "style": {
-    "primaryColor": "couleur hex principale du site",
-    "secondaryColor": "couleur hex secondaire (zone messages)",
-    "accentColor": "couleur hex d'accent",
-    "widgetBgColor": "couleur hex de fond du widget",
-    "textColor": "couleur hex du texte principal",
-    "userBubbleColor": "couleur hex des bulles utilisateur — doit CONTRASTER fortement avec le fond",
-    "botBubbleColor": "couleur hex des bulles bot — doit être LISIBLE sur le fond",
-    "buttonColor": "couleur hex des boutons — doit CONTRASTER fortement avec le fond du widget",
-    "borderColor": "couleur hex bordure légère",
-    "headerColor": "couleur hex de l'en-tête",
-    "iconColor": "couleur hex des icônes"
+    "primaryColor": "Couleur principale/brand du site (ex: #a0886d). Si le site est sombre, cette couleur sera utilisée comme accent sur un fond clair.",
+    "widgetBgColor": "Couleur de fond dominante du site. Si c'est un fond très sombre (noir, gris foncé), mets la valeur exacte ici. Le système adaptera automatiquement le reste.",
+    "borderRadius": "6px",
+    "buttonRadius": "4px",
+    "shadow": "0 1px 3px rgba(0,0,0,0.08)",
+    "widgetWidth": "420px",
+    "maxHeight": "680px",
+    "widgetPosition": "right",
+    "padding": "16px",
+    "fontFamily": "Georgia, 'Times New Roman', serif",
+    "fontSize": "15px",
+    "fabStyle": "default"
   }
 }
 
@@ -312,12 +328,10 @@ RÈGLES IMPORTANTES :
 2. Génère au moins 4 services réels trouvés sur le site. Si aucun prix n'est visible, mets "Sur devis".
 3. Génère au moins 4 FAQ pertinentes pour ce type d'entreprise.
 4. Les quickReplies DOIVENT être exactement les 4 fournies ci-dessus avec les mêmes id/action.
-5. RÈGLE CRITIQUE — COULEURS : Si le site a un fond SOMBRE (noir, gris très foncé, etc.), tu DOIS générer un thème CLAIR pour le chatbot (fond clair, boutons visibles, texte foncé). Si le site a un fond CLAIR, tu peux garder un thème clair ou un thème sombre élégant, mais TOUJOURS avec des couleurs lisibles. JAMAIS de fond noir avec des boutons noirs. JAMAIS de texte sombre sur fond sombre. JAMAIS de texte clair sur fond clair. Chaque élément doit être lisible.
-6. userBubbleColor : si fond clair → bulle foncée (ex: #111111). Si fond sombre → bulle claire (ex: #F5F3EE) pour que le texte soit visible.
-7. buttonColor : DOIT contraster avec widgetBgColor. Si widgetBgColor est noir/gris foncé → buttonColor DOIT être clair (#F5F3EE, blanc, beige, etc.). Si widgetBgColor est clair → buttonColor peut être la couleur principale du site.
-8. botBubbleColor : DOIT être lisible. Légèrement différent de widgetBgColor pour la distinction.
-9. textColor : DOIT être foncé (#111111) sur fond clair, ou clair (#F5F3EE) sur fond sombre.
-10. Réponds UNIQUEMENT avec le JSON valide, sans markdown, sans explication.`;
+5. COULEURS — Tu n'as besoin de générer QUE "primaryColor" et "widgetBgColor". Toutes les autres couleurs (texte, bulles, boutons, bordures) seront calculées automatiquement par le système pour garantir un thème lisible. Ne te préoccupe PAS de la cohérence des couleurs, le système s'en charge.
+6. Si le site a un fond TRÈS SOMBRE (noir, gris foncé, #111111, etc.), mets cette couleur dans widgetBgColor. Le système construira un thème sombre cohérent avec des boutons et un texte clairs.
+7. Si le site a un fond CLAIR, mets cette couleur dans widgetBgColor. Le système construira un thème clair cohérent.
+8. Réponds UNIQUEMENT avec le JSON valide, sans markdown, sans explication.`;
 
     let completion;
     try {
@@ -367,8 +381,8 @@ RÈGLES IMPORTANTES :
       }
     }
 
-    // Ensure color coherence (no black-on-black, sufficient contrast)
-    generated.style = ensureColorCoherence(generated.style);
+    // Build a fully coherent theme from extracted/generated colors
+    generated.style = buildCoherentTheme(generated.style);
 
     // Ensure logoUrl is set
     if (!generated.logoUrl && logoUrl) {
