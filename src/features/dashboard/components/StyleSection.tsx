@@ -7,6 +7,7 @@
 
 import { ChatbotStyle } from "@/features/chatbot/types";
 import { ChatPreview } from "@/features/chatbot/components/ChatPreview";
+import { ChatFabPreview } from "@/features/chatbot/components/ChatFabPreview";
 import { defaultChatbotConfig } from "@/features/chatbot/config/chatbotConfig";
 
 interface StyleSectionProps {
@@ -15,16 +16,31 @@ interface StyleSectionProps {
   onChange: (values: Partial<ChatbotStyle>) => void;
 }
 
+const FONT_OPTIONS = [
+  { value: "Georgia, 'Times New Roman', serif", label: "Georgia (serif élégant)" },
+  { value: "'Helvetica Neue', Helvetica, Arial, sans-serif", label: "Helvetica (sans-serif moderne)" },
+  { value: "'Inter', sans-serif", label: "Inter (sans-serif clean)" },
+  { value: "'Roboto', sans-serif", label: "Roboto (Google sans-serif)" },
+  { value: "'Open Sans', sans-serif", label: "Open Sans (lisible)" },
+  { value: "'Lato', sans-serif", label: "Lato (chaleureux)" },
+  { value: "'Montserrat', sans-serif", label: "Montserrat (tendance)" },
+  { value: "'Poppins', sans-serif", label: "Poppins (moderne)" },
+  { value: "'Playfair Display', serif", label: "Playfair Display (serif luxe)" },
+  { value: "'Merriweather', serif", label: "Merriweather (serif lisible)" },
+  { value: "'Space Mono', monospace", label: "Space Mono (technique)" },
+  { value: "'Courier New', monospace", label: "Courier (monospace)" },
+];
+
 export function StyleSection({ style, branding, onChange }: StyleSectionProps) {
   const colorFields = [
-    { key: "primaryColor" as const, label: "Couleur principale", desc: "Thème global, liens, accents" },
+    { key: "primaryColor" as const, label: "Couleur principale", desc: "Thème global, accents visibles" },
     { key: "secondaryColor" as const, label: "Couleur secondaire", desc: "Fond de la zone de messages" },
-    { key: "accentColor" as const, label: "Couleur d'accent", desc: "Surbrillance, éléments actifs" },
+    { key: "accentColor" as const, label: "Couleur d'accent", desc: "Surbrillance, loader, hover bouton envoi" },
     { key: "widgetBgColor" as const, label: "Fond du widget", desc: "Arrière-plan de la fenêtre chat" },
     { key: "textColor" as const, label: "Texte principal", desc: "Texte des messages du bot" },
     { key: "userBubbleColor" as const, label: "Bulles utilisateur", desc: "Fond des messages envoyés" },
     { key: "botBubbleColor" as const, label: "Bulles bot", desc: "Fond des messages reçus" },
-    { key: "buttonColor" as const, label: "Boutons", desc: "Fond des boutons d'action et envoi" },
+    { key: "buttonColor" as const, label: "Boutons", desc: "Fond des boutons d'action, bulle FAB, avatar" },
     { key: "borderColor" as const, label: "Bordures", desc: "Bordures du widget et séparateurs" },
     { key: "headerColor" as const, label: "Header", desc: "Fond de l'en-tête du chat" },
     { key: "iconColor" as const, label: "Icônes", desc: "Couleur des icônes du header" },
@@ -178,12 +194,18 @@ export function StyleSection({ style, branding, onChange }: StyleSectionProps) {
               </div>
               <div>
                 <label className="dashboard-label">Police</label>
-                <input
-                  type="text"
+                <select
                   value={style.fontFamily}
                   onChange={(e) => onChange({ fontFamily: e.target.value })}
                   className="dashboard-input"
-                />
+                  style={{ fontFamily: style.fontFamily }}
+                >
+                  {FONT_OPTIONS.map((f) => (
+                    <option key={f.value} value={f.value} style={{ fontFamily: f.value }}>
+                      {f.label}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="dashboard-label">Taille de police</label>
@@ -243,32 +265,63 @@ export function StyleSection({ style, branding, onChange }: StyleSectionProps) {
           </div>
         </div>
 
-        {/* Right column: preview */}
-        <div className="xl:col-span-2">
-          <div className="lg:sticky lg:top-24 self-start">
-            <h3
-              style={{
-                fontFamily: "'Space Mono', monospace",
-                fontSize: "14px",
-                fontWeight: 700,
-                marginBottom: "16px",
-                textTransform: "uppercase",
-                letterSpacing: "0.04em",
-              }}
-            >
-              Aperçu en temps réel
-            </h3>
-            <div
-              className="border border-[#E0E0E0] p-4 flex justify-center"
-              style={{ borderRadius: "2px", background: "rgba(0,0,0,0.02)" }}
-            >
-              <ChatPreview
-                config={{
-                  ...defaultChatbotConfig,
-                  style: { ...defaultChatbotConfig.style, ...style },
-                  branding: { ...defaultChatbotConfig.branding, ...branding },
+        {/* Right column: previews */}
+        <div className="xl:col-span-2 space-y-8">
+          <div className="lg:sticky lg:top-24 self-start space-y-6">
+            {/* Widget preview */}
+            <div>
+              <h3
+                style={{
+                  fontFamily: "'Space Mono', monospace",
+                  fontSize: "14px",
+                  fontWeight: 700,
+                  marginBottom: "16px",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.04em",
                 }}
-              />
+              >
+                Aperçu du widget
+              </h3>
+              <div
+                className="border border-[#E0E0E0] p-4 flex justify-center"
+                style={{ borderRadius: "2px", background: "rgba(0,0,0,0.02)" }}
+              >
+                <ChatPreview
+                  config={{
+                    ...defaultChatbotConfig,
+                    style: { ...defaultChatbotConfig.style, ...style },
+                    branding: { ...defaultChatbotConfig.branding, ...branding },
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* FAB bubble preview */}
+            <div>
+              <h3
+                style={{
+                  fontFamily: "'Space Mono', monospace",
+                  fontSize: "14px",
+                  fontWeight: 700,
+                  marginBottom: "16px",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.04em",
+                }}
+              >
+                Aperçu de la bulle
+              </h3>
+              <div
+                className="border border-[#E0E0E0] p-4"
+                style={{ borderRadius: "2px", background: "rgba(0,0,0,0.02)", height: "120px" }}
+              >
+                <ChatFabPreview
+                  buttonColor={style.buttonColor}
+                  primaryColor={style.primaryColor}
+                  borderRadius={style.borderRadius}
+                  shadow={style.shadow}
+                  widgetPosition={style.widgetPosition}
+                />
+              </div>
             </div>
           </div>
         </div>

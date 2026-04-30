@@ -118,11 +118,13 @@ export function ChatPreview({ config: propConfig }: ChatPreviewProps) {
     <div
       className="flex flex-col"
       style={{
-        width: "100%",
+        width: config.style.widgetWidth || "100%",
+        maxWidth: "100%",
         height: "100%",
+        maxHeight: config.style.maxHeight || "680px",
         minHeight: "480px",
         background: config.style.widgetBgColor,
-        border: "1px solid rgba(17,17,17,0.10)",
+        border: `1px solid ${config.style.borderColor || "rgba(17,17,17,0.10)"}`,
         borderRadius: config.style.borderRadius,
         overflow: "hidden",
         fontFamily: config.style.fontFamily,
@@ -136,6 +138,7 @@ export function ChatPreview({ config: propConfig }: ChatPreviewProps) {
         textColor={config.style.textColor}
         iconColor={config.style.iconColor}
         buttonColor={config.style.buttonColor}
+        primaryColor={config.style.primaryColor}
       />
       <div
         className="flex-1 overflow-y-auto"
@@ -160,6 +163,9 @@ export function ChatPreview({ config: propConfig }: ChatPreviewProps) {
         disabled={false}
         placeholder={config.branding.inputPlaceholder}
         buttonColor={config.style.buttonColor}
+        primaryColor={config.style.primaryColor}
+        accentColor={config.style.accentColor}
+        fontFamily={config.style.fontFamily}
       />
     </div>
   );

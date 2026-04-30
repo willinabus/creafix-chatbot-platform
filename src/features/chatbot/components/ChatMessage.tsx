@@ -26,6 +26,7 @@ export function ChatMessage({ message, onQuickReply, isLoading, style }: ChatMes
   const fontFamily = style?.fontFamily || "Georgia, 'Times New Roman', serif";
   const buttonColor = style?.buttonColor || "#0c0b09";
   const buttonRadius = style?.buttonRadius || "4px";
+  const accentColor = style?.accentColor || buttonColor;
 
   // Dynamic text color based on bubble background
   const userTextColor = getContrastText(userBubbleColor);
@@ -59,17 +60,20 @@ export function ChatMessage({ message, onQuickReply, isLoading, style }: ChatMes
               <motion.span
                 animate={{ opacity: [0.3, 1, 0.3] }}
                 transition={{ duration: 1.2, repeat: Infinity, delay: 0 }}
-                className="w-1.5 h-1.5 rounded-full bg-current opacity-40"
+                className="w-1.5 h-1.5 rounded-full opacity-40"
+                style={{ backgroundColor: accentColor }}
               />
               <motion.span
                 animate={{ opacity: [0.3, 1, 0.3] }}
                 transition={{ duration: 1.2, repeat: Infinity, delay: 0.2 }}
-                className="w-1.5 h-1.5 rounded-full bg-current opacity-40"
+                className="w-1.5 h-1.5 rounded-full opacity-40"
+                style={{ backgroundColor: accentColor }}
               />
               <motion.span
                 animate={{ opacity: [0.3, 1, 0.3] }}
                 transition={{ duration: 1.2, repeat: Infinity, delay: 0.4 }}
-                className="w-1.5 h-1.5 rounded-full bg-current opacity-40"
+                className="w-1.5 h-1.5 rounded-full opacity-40"
+                style={{ backgroundColor: accentColor }}
               />
             </div>
           ) : (

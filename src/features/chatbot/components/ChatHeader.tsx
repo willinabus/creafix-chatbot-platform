@@ -15,9 +15,10 @@ interface ChatHeaderProps {
   textColor?: string;
   iconColor?: string;
   buttonColor?: string;
+  primaryColor?: string;
 }
 
-export function ChatHeader({ title, subtitle, onClose, onMinimize, headerColor, textColor, iconColor, buttonColor }: ChatHeaderProps) {
+export function ChatHeader({ title, subtitle, onClose, onMinimize, headerColor, textColor, iconColor, buttonColor, primaryColor }: ChatHeaderProps) {
   const headerBg = headerColor || "#FCFBF8";
   const txtColor = textColor || "#111111";
   const icnColor = iconColor || "rgba(17,17,17,0.42)";

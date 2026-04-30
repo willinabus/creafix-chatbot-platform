@@ -11,9 +11,12 @@ interface ChatInputProps {
   disabled?: boolean;
   placeholder?: string;
   buttonColor?: string;
+  primaryColor?: string;
+  accentColor?: string;
+  fontFamily?: string;
 }
 
-export function ChatInput({ onSend, disabled, placeholder = "Écrivez votre message...", buttonColor }: ChatInputProps) {
+export function ChatInput({ onSend, disabled, placeholder = "Écrivez votre message...", buttonColor, primaryColor, accentColor, fontFamily }: ChatInputProps) {
   const [value, setValue] = useState("");
 
   const handleSubmit = (e: FormEvent) => {
@@ -30,7 +33,8 @@ export function ChatInput({ onSend, disabled, placeholder = "Écrivez votre mess
     }
   };
 
-  const bg = buttonColor || "#0c0b09";
+  const bg = buttonColor || primaryColor || "#0c0b09";
+  const activeBg = accentColor || primaryColor || bg;
 
   return (
     <form
@@ -50,7 +54,7 @@ export function ChatInput({ onSend, disabled, placeholder = "Écrivez votre mess
         rows={1}
         className="flex-1 resize-none outline-none bg-transparent"
         style={{
-          fontFamily: "Georgia, 'Times New Roman', serif",
+          fontFamily: fontFamily || "Georgia, 'Times New Roman', serif",
           fontSize: "15px",
           lineHeight: 1.5,
           color: "#111111",
@@ -75,11 +79,11 @@ export function ChatInput({ onSend, disabled, placeholder = "Écrivez votre mess
         }}
         onMouseEnter={(e) => {
           if (!disabled && value.trim()) {
-            e.currentTarget.style.opacity = "0.85";
+            e.currentTarget.style.background = activeBg;
           }
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.opacity = "1";
+          e.currentTarget.style.background = bg;
         }}
       >
         <Send
