@@ -98,10 +98,15 @@ export function ChatWidget({ isOpen: controlledOpen, onToggle, embedded = false,
           fontFamily: config.style.fontFamily,
         }}
       >
-        <ChatHeader
-          title={config.branding.name}
-          subtitle={config.branding.companyName}
-        />
+      <ChatHeader
+        title={config.branding.name}
+        subtitle={config.branding.companyName}
+        onClose={() => {
+          if (typeof window !== "undefined" && window.parent !== window) {
+            window.parent.postMessage({ type: "CF_CHATBOT_CLOSE" }, "*");
+          }
+        }}
+      />
         <div
           className="flex-1 overflow-y-auto"
           style={{
