@@ -4,6 +4,7 @@
  */
 
 import { X, Minus } from "lucide-react";
+import { getContrastText } from "@/lib/colors";
 
 interface ChatHeaderProps {
   title: string;
@@ -21,6 +22,7 @@ export function ChatHeader({ title, subtitle, onClose, onMinimize, headerColor, 
   const txtColor = textColor || "#111111";
   const icnColor = iconColor || "rgba(17,17,17,0.42)";
   const btnColor = buttonColor || "#0c0b09";
+  const avatarTextColor = getContrastText(btnColor);
 
   return (
     <div
@@ -39,7 +41,7 @@ export function ChatHeader({ title, subtitle, onClose, onMinimize, headerColor, 
             height: "36px",
             borderRadius: "4px",
             background: btnColor,
-            color: "#F5F3EE",
+            color: avatarTextColor,
             fontFamily: "Georgia, serif",
             fontSize: "14px",
             fontWeight: 400,

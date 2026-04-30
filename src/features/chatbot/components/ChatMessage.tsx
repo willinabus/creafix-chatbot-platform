@@ -6,6 +6,7 @@
 import { Message, ChatbotStyle } from "@/features/chatbot/types";
 import { motion } from "framer-motion";
 import { QuickReplies } from "./QuickReplies";
+import { getContrastText } from "@/lib/colors";
 
 interface ChatMessageProps {
   message: Message;
@@ -26,8 +27,8 @@ export function ChatMessage({ message, onQuickReply, isLoading, style }: ChatMes
   const buttonColor = style?.buttonColor || "#0c0b09";
   const buttonRadius = style?.buttonRadius || "4px";
 
-  // Determine text color for user bubble (light on dark)
-  const userTextColor = "#F5F3EE";
+  // Dynamic text color based on bubble background
+  const userTextColor = getContrastText(userBubbleColor);
 
   return (
     <motion.div

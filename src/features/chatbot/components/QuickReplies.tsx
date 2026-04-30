@@ -7,6 +7,7 @@
 
 import { QuickReply } from "@/features/chatbot/types";
 import { motion } from "framer-motion";
+import { getContrastText } from "@/lib/colors";
 
 interface QuickRepliesProps {
   replies: QuickReply[];
@@ -21,7 +22,9 @@ export function QuickReplies({ replies, onSelect, disabled, buttonColor, buttonR
 
   const bg = buttonColor || "#0c0b09";
   const radius = buttonRadius || "4px";
-  const hoverBg = bg === "#0c0b09" ? "#2a2825" : bg; // simple fallback
+  const textColor = getContrastText(bg);
+  // Hover: slightly lighter or darker
+  const hoverBg = textColor === "#F5F3EE" ? "#2a2825" : "#e0ded9";
 
   return (
     <motion.div
@@ -46,7 +49,7 @@ export function QuickReplies({ replies, onSelect, disabled, buttonColor, buttonR
             background: bg,
             border: `1px solid ${bg}`,
             borderRadius: radius,
-            color: "#F5F3EE",
+            color: textColor,
             cursor: disabled ? "not-allowed" : "pointer",
             opacity: disabled ? 0.4 : 1,
             transition: "all 0.15s ease",
