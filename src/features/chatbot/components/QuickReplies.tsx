@@ -12,10 +12,16 @@ interface QuickRepliesProps {
   replies: QuickReply[];
   onSelect: (reply: QuickReply) => void;
   disabled?: boolean;
+  buttonColor?: string;
+  buttonRadius?: string;
 }
 
-export function QuickReplies({ replies, onSelect, disabled }: QuickRepliesProps) {
+export function QuickReplies({ replies, onSelect, disabled, buttonColor, buttonRadius }: QuickRepliesProps) {
   if (!replies || replies.length === 0) return null;
+
+  const bg = buttonColor || "#0c0b09";
+  const radius = buttonRadius || "4px";
+  const hoverBg = bg === "#0c0b09" ? "#2a2825" : bg; // simple fallback
 
   return (
     <motion.div
@@ -37,9 +43,9 @@ export function QuickReplies({ replies, onSelect, disabled }: QuickRepliesProps)
             padding: "10px 18px",
             fontSize: "13px",
             fontFamily: "'Space Mono', 'Courier New', monospace",
-            background: "#0c0b09",
-            border: "1px solid #0c0b09",
-            borderRadius: "4px",
+            background: bg,
+            border: `1px solid ${bg}`,
+            borderRadius: radius,
             color: "#F5F3EE",
             cursor: disabled ? "not-allowed" : "pointer",
             opacity: disabled ? 0.4 : 1,
@@ -51,12 +57,12 @@ export function QuickReplies({ replies, onSelect, disabled }: QuickRepliesProps)
           }}
           onMouseEnter={(e) => {
             if (!disabled) {
-              e.currentTarget.style.background = "#2a2825";
+              e.currentTarget.style.background = hoverBg;
               e.currentTarget.style.transform = "translateY(-1px)";
             }
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.background = "#0c0b09";
+            e.currentTarget.style.background = bg;
             e.currentTarget.style.transform = "translateY(0)";
           }}
         >

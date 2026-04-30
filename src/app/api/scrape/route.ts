@@ -7,6 +7,114 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createChatCompletion, isOpenAIConfigured } from "@/lib/openai";
 
+/**
+ * Color coherence helpers
+ * Ensures imported colors have sufficient contrast and no black-on-black
+ */
+function hexToRgb(hex: string) {
+  const clean = hex.replace("#", "");
+  const bigint = parseInt(clean.length === 3 ? clean.split("").map((c) => c + c).join("") : clean, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function luminance({ r, g, b }: { r: number; g: number; b: number }) {
+  const a = [r, g, b].map((v) => {
+    v /= 255;
+    return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+  });
+  return a[0] * 0.2126 + a[1] * 0.7152 + a[2] * 0.0722;
+}
+
+function contrastRatio(hex1: string, hex2: string) {
+  const l1 = luminance(hexToRgb(hex1)) + 0.05;
+  const l2 = luminance(hexToRgb(hex2)) + 0.05;
+  return l1 > l2 ? l1 / l2 : l2 / l1;
+}
+
+function isDark(hex: string) {
+  return luminance(hexToRgb(hex)) < 0.5;
+}
+
+function lighten(hex: string, amount: number) {
+  const { r, g, b } = hexToRgb(hex);
+  const f = (c: number) => Math.min(255, Math.round(c + (255 - c) * amount));
+  const toHex = (n: number) => n.toString(16).padStart(2, "0");
+  return `#${toHex(f(r))}${toHex(f(g))}${toHex(f(b))}`;
+}
+
+function darken(hex: string, amount: number) {
+  const { r, g, b } = hexToRgb(hex);
+  const f = (c: number) => Math.max(0, Math.round(c * (1 - amount)));
+  const toHex = (n: number) => n.toString(16).padStart(2, "0");
+  return `#${toHex(f(r))}${toHex(f(g))}${toHex(f(b))}`;
+}
+
+function ensureColorCoherence(style: Record<string, string>) {
+  const s = { ...style };
+
+  // Ensure we have hex values
+  const ensureHex = (c?: string) => {
+    if (!c) return undefined;
+    if (c.startsWith("#")) return c;
+    if (c.startsWith("rgb")) return undefined; // skip complex values
+    if (/^[0-9A-Fa-f]{3,6}$/.test(c)) return `#${c}`;
+    return undefined;
+  };
+
+  const fix = (key: string) => {
+    const v = ensureHex(s[key]);
+    if (v) s[key] = v;
+  };
+  ["primaryColor", "secondaryColor", "accentColor", "widgetBgColor", "textColor", "userBubbleColor", "botBubbleColor", "buttonColor", "borderColor", "headerColor", "iconColor"].forEach(fix);
+
+  const bg = s.widgetBgColor || "#FCFBF8";
+  const btn = s.buttonColor || s.primaryColor || "#0c0b09";
+  const txt = s.textColor || "#111111";
+
+  // 1. buttonColor must be different from widgetBgColor
+  if (s.buttonColor && s.widgetBgColor && s.buttonColor.toLowerCase() === s.widgetBgColor.toLowerCase()) {
+    s.buttonColor = isDark(bg) ? lighten(bg, 0.4) : darken(bg, 0.5);
+  }
+
+  // 2. textColor must contrast with widgetBgColor
+  if (s.textColor && s.widgetBgColor && contrastRatio(s.textColor, s.widgetBgColor) < 2.5) {
+    s.textColor = isDark(bg) ? "#F5F3EE" : "#111111";
+  }
+
+  // 3. textColor must contrast with botBubbleColor
+  const botBubble = s.botBubbleColor || bg;
+  if (s.textColor && contrastRatio(s.textColor, botBubble) < 2.5) {
+    s.textColor = isDark(botBubble) ? "#F5F3EE" : "#111111";
+  }
+
+  // 4. botBubbleColor should be different from widgetBgColor (subtle)
+  if (s.botBubbleColor && s.widgetBgColor && s.botBubbleColor.toLowerCase() === s.widgetBgColor.toLowerCase()) {
+    s.botBubbleColor = isDark(bg) ? lighten(bg, 0.15) : darken(bg, 0.06);
+  }
+
+  // 5. userBubbleColor should be dark (text on it is always light)
+  if (s.userBubbleColor && !isDark(s.userBubbleColor)) {
+    s.userBubbleColor = darken(s.userBubbleColor, 0.5);
+  }
+
+  // 6. borderColor should be visible
+  if (s.borderColor && s.widgetBgColor && contrastRatio(s.borderColor, s.widgetBgColor) < 1.1) {
+    s.borderColor = isDark(bg) ? "rgba(245,243,238,0.15)" : "rgba(17,17,17,0.10)";
+  }
+
+  // 7. headerColor defaults to widgetBgColor if missing
+  if (!s.headerColor && s.widgetBgColor) {
+    s.headerColor = s.widgetBgColor;
+  }
+
+  // 8. iconColor defaults to primaryColor
+  if (!s.iconColor && s.primaryColor) {
+    s.iconColor = s.primaryColor;
+  }
+
+  return s;
+}
+
 const FIRECRAWL_API_KEY = process.env.FIRECRAWL_API_KEY;
 const FIRECRAWL_API_URL = "https://api.firecrawl.dev/v2/scrape";
 
@@ -228,6 +336,9 @@ RÈGLES IMPORTANTES :
         generated.style[key] = val;
       }
     }
+
+    // Ensure color coherence (no black-on-black, sufficient contrast)
+    generated.style = ensureColorCoherence(generated.style);
 
     // Ensure logoUrl is set
     if (!generated.logoUrl && logoUrl) {

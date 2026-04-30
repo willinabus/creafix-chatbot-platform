@@ -10,14 +10,23 @@ interface ChatHeaderProps {
   subtitle?: string;
   onClose?: () => void;
   onMinimize?: () => void;
+  headerColor?: string;
+  textColor?: string;
+  iconColor?: string;
+  buttonColor?: string;
 }
 
-export function ChatHeader({ title, subtitle, onClose, onMinimize }: ChatHeaderProps) {
+export function ChatHeader({ title, subtitle, onClose, onMinimize, headerColor, textColor, iconColor, buttonColor }: ChatHeaderProps) {
+  const headerBg = headerColor || "#FCFBF8";
+  const txtColor = textColor || "#111111";
+  const icnColor = iconColor || "rgba(17,17,17,0.42)";
+  const btnColor = buttonColor || "#0c0b09";
+
   return (
     <div
       className="flex items-center justify-between px-5 py-4"
       style={{
-        background: "#FCFBF8",
+        background: headerBg,
         borderBottom: "1px solid rgba(17,17,17,0.08)",
       }}
     >
@@ -29,7 +38,7 @@ export function ChatHeader({ title, subtitle, onClose, onMinimize }: ChatHeaderP
             width: "36px",
             height: "36px",
             borderRadius: "4px",
-            background: "#0c0b09",
+            background: btnColor,
             color: "#F5F3EE",
             fontFamily: "Georgia, serif",
             fontSize: "14px",
@@ -45,7 +54,7 @@ export function ChatHeader({ title, subtitle, onClose, onMinimize }: ChatHeaderP
               fontFamily: "Georgia, 'Times New Roman', serif",
               fontSize: "16px",
               fontWeight: 400,
-              color: "#111111",
+              color: txtColor,
               lineHeight: 1.3,
               letterSpacing: "0.02em",
             }}
@@ -57,7 +66,7 @@ export function ChatHeader({ title, subtitle, onClose, onMinimize }: ChatHeaderP
               style={{
                 fontFamily: "'Space Mono', monospace",
                 fontSize: "11px",
-                color: "rgba(17,17,17,0.42)",
+                color: icnColor,
                 lineHeight: 1.3,
                 textTransform: "uppercase",
                 letterSpacing: "0.08em",
@@ -81,11 +90,11 @@ export function ChatHeader({ title, subtitle, onClose, onMinimize }: ChatHeaderP
               background: "transparent",
               border: "none",
               cursor: "pointer",
-              color: "rgba(17,17,17,0.42)",
+              color: icnColor,
               transition: "color 0.15s ease",
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = "#111111"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(17,17,17,0.42)"; }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = txtColor; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = icnColor; }}
           >
             <Minus size={16} />
           </button>
@@ -101,11 +110,11 @@ export function ChatHeader({ title, subtitle, onClose, onMinimize }: ChatHeaderP
               background: "transparent",
               border: "none",
               cursor: "pointer",
-              color: "rgba(17,17,17,0.42)",
+              color: icnColor,
               transition: "color 0.15s ease",
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = "#111111"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(17,17,17,0.42)"; }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = txtColor; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = icnColor; }}
           >
             <X size={16} />
           </button>

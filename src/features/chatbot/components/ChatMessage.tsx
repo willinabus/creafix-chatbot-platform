@@ -3,7 +3,7 @@
  * Individual message bubble with Clarissa design system
  */
 
-import { Message } from "@/features/chatbot/types";
+import { Message, ChatbotStyle } from "@/features/chatbot/types";
 import { motion } from "framer-motion";
 import { QuickReplies } from "./QuickReplies";
 
@@ -11,11 +11,23 @@ interface ChatMessageProps {
   message: Message;
   onQuickReply: (reply: import("@/features/chatbot/types").QuickReply) => void;
   isLoading?: boolean;
+  style?: Partial<ChatbotStyle>;
 }
 
-export function ChatMessage({ message, onQuickReply, isLoading }: ChatMessageProps) {
+export function ChatMessage({ message, onQuickReply, isLoading, style }: ChatMessageProps) {
   const isUser = message.role === "user";
   const isAssistant = message.role === "assistant";
+
+  const userBubbleColor = style?.userBubbleColor || "#0c0b09";
+  const botBubbleColor = style?.botBubbleColor || "#F5F3EE";
+  const textColor = style?.textColor || "#111111";
+  const borderColor = style?.borderColor || "rgba(17,17,17,0.08)";
+  const fontFamily = style?.fontFamily || "Georgia, 'Times New Roman', serif";
+  const buttonColor = style?.buttonColor || "#0c0b09";
+  const buttonRadius = style?.buttonRadius || "4px";
+
+  // Determine text color for user bubble (light on dark)
+  const userTextColor = "#F5F3EE";
 
   return (
     <motion.div
@@ -31,11 +43,11 @@ export function ChatMessage({ message, onQuickReply, isLoading }: ChatMessagePro
           style={{
             padding: "14px 18px",
             borderRadius: isUser ? "6px 6px 0 6px" : "6px 6px 6px 0",
-            background: isUser ? "#0c0b09" : "#F5F3EE",
-            color: isUser ? "#F5F3EE" : "#111111",
-            border: isUser ? "none" : "1px solid rgba(17,17,17,0.08)",
-            fontFamily: "Georgia, 'Times New Roman', serif",
-            fontSize: "15px",
+            background: isUser ? userBubbleColor : botBubbleColor,
+            color: isUser ? userTextColor : textColor,
+            border: isUser ? "none" : `1px solid ${borderColor}`,
+            fontFamily,
+            fontSize: style?.fontSize || "15px",
             lineHeight: 1.6,
             letterSpacing: "0.01em",
             wordBreak: "break-word",
@@ -70,6 +82,8 @@ export function ChatMessage({ message, onQuickReply, isLoading }: ChatMessagePro
             replies={message.quickReplies}
             onSelect={onQuickReply}
             disabled={isLoading}
+            buttonColor={buttonColor}
+            buttonRadius={buttonRadius}
           />
         )}
       </div>

@@ -10,9 +10,10 @@ interface ChatInputProps {
   onSend: (message: string) => void;
   disabled?: boolean;
   placeholder?: string;
+  buttonColor?: string;
 }
 
-export function ChatInput({ onSend, disabled, placeholder = "Écrivez votre message..." }: ChatInputProps) {
+export function ChatInput({ onSend, disabled, placeholder = "Écrivez votre message...", buttonColor }: ChatInputProps) {
   const [value, setValue] = useState("");
 
   const handleSubmit = (e: FormEvent) => {
@@ -28,6 +29,8 @@ export function ChatInput({ onSend, disabled, placeholder = "Écrivez votre mess
       handleSubmit(e as unknown as FormEvent);
     }
   };
+
+  const bg = buttonColor || "#0c0b09";
 
   return (
     <form
@@ -63,7 +66,7 @@ export function ChatInput({ onSend, disabled, placeholder = "Écrivez votre mess
         style={{
           width: "36px",
           height: "36px",
-          background: disabled || !value.trim() ? "rgba(17,17,17,0.06)" : "#0c0b09",
+          background: disabled || !value.trim() ? "rgba(17,17,17,0.06)" : bg,
           border: "none",
           borderRadius: "4px",
           cursor: disabled || !value.trim() ? "not-allowed" : "pointer",

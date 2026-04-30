@@ -132,6 +132,10 @@ export function ChatPreview({ config: propConfig }: ChatPreviewProps) {
       <ChatHeader
         title={config.branding.name}
         subtitle={config.branding.companyName}
+        headerColor={config.style.headerColor}
+        textColor={config.style.textColor}
+        iconColor={config.style.iconColor}
+        buttonColor={config.style.buttonColor}
       />
       <div
         className="flex-1 overflow-y-auto"
@@ -146,6 +150,7 @@ export function ChatPreview({ config: propConfig }: ChatPreviewProps) {
             message={msg}
             onQuickReply={handleQuickReply}
             isLoading={false}
+            style={config.style}
           />
         ))}
         <div style={{ height: 1 }} />
@@ -154,6 +159,7 @@ export function ChatPreview({ config: propConfig }: ChatPreviewProps) {
         onSend={handleSend}
         disabled={false}
         placeholder={config.branding.inputPlaceholder}
+        buttonColor={config.style.buttonColor}
       />
     </div>
   );
