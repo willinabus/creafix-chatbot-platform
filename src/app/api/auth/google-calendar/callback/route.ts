@@ -34,7 +34,13 @@ export async function GET(request: NextRequest) {
 
     const clientId = process.env.GOOGLE_CLIENT_ID;
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-    const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/google-calendar/callback`;
+
+    // Detect redirect URI from request (must match exactly what was sent in auth URL)
+    const protocol = request.headers.get("x-forwarded-proto") || "https";
+    const host = request.headers.get("host") || "";
+    const detectedUrl = host ? `${protocol}://${host}` : "";
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || detectedUrl;
+    const redirectUri = `${appUrl}/api/auth/google-calendar/callback`;
 
     if (!clientId || !clientSecret) {
       return NextResponse.json(
