@@ -16,6 +16,7 @@ export function CalendarSection({ botId }: CalendarSectionProps) {
   const [googleConfigured, setGoogleConfigured] = useState(false);
   const [authUrl, setAuthUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch(`/api/status?botId=${botId}`)
@@ -31,10 +32,17 @@ export function CalendarSection({ botId }: CalendarSectionProps) {
   }, [botId]);
 
   const generateAuthLink = async () => {
-    const res = await fetch(`/api/auth/google-calendar?botId=${botId}`);
-    const data = await res.json();
-    if (data.success) {
-      setAuthUrl(data.data.authUrl);
+    setError(null);
+    try {
+      const res = await fetch(`/api/auth/google-calendar?botId=${botId}`);
+      const data = await res.json();
+      if (data.success) {
+        setAuthUrl(data.data.authUrl);
+      } else {
+        setError(data.error || "Erreur lors de la génération du lien");
+      }
+    } catch (e) {
+      setError("Erreur réseau — vérifiez votre connexion");
     }
   };
 
@@ -126,6 +134,24 @@ export function CalendarSection({ botId }: CalendarSectionProps) {
           >
             Lien d'autorisation pour le client
           </h3>
+
+          {error && (
+            <div
+              className="p-3 border border-[#ef4444] mb-3"
+              style={{ borderRadius: "2px", background: "rgba(239,68,68,0.06)" }}
+            >
+              <p
+                style={{
+                  fontFamily: "'Space Mono', monospace",
+                  fontSize: "12px",
+                  color: "#ef4444",
+                  lineHeight: 1.5,
+                }}
+              >
+                {error}
+              </p>
+            </div>
+          )}
 
           {!authUrl ? (
             <button

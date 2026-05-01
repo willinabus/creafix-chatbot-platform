@@ -13,7 +13,12 @@ export async function GET(request: NextRequest) {
   const botId = searchParams.get("botId") || "default";
 
   const clientId = process.env.GOOGLE_CLIENT_ID;
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+
+  // Fallback: detect host from request if NEXT_PUBLIC_APP_URL is not set
+  const protocol = request.headers.get("x-forwarded-proto") || "https";
+  const host = request.headers.get("host") || "";
+  const detectedUrl = host ? `${protocol}://${host}` : "";
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || detectedUrl;
   const redirectUri = `${appUrl}/api/auth/google-calendar/callback`;
 
   if (!clientId) {
@@ -25,7 +30,7 @@ export async function GET(request: NextRequest) {
 
   if (!appUrl) {
     return NextResponse.json(
-      { success: false, error: "NEXT_PUBLIC_APP_URL not configured" },
+      { success: false, error: "NEXT_PUBLIC_APP_URL not configured — veuillez ajouter NEXT_PUBLIC_APP_URL=https://votre-domaine.vercel.app dans les variables d'environnement Vercel" },
       { status: 500 }
     );
   }
