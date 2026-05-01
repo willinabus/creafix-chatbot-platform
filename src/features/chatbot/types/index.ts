@@ -52,6 +52,7 @@ export interface ConversationContext {
   phone?: string;
   email?: string;
   appointmentConfirmed?: boolean;
+  availableSlots?: string[];
 }
 
 export interface ChatbotBranding {

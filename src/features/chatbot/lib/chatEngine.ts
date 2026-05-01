@@ -111,10 +111,13 @@ export async function processMessage(
           toolResults.push(result);
           const fnName = (toolCall as { function: { name: string } }).function.name;
           if (fnName === "check_availability" && !result.content.startsWith("Aucun créneau") && !result.content.startsWith("Erreur")) {
-            contextAfterTools = { ...contextAfterTools, step: "choose_slot" };
+            // Parse available slots from tool result to show as quick replies
+            const slotMatches = result.content.match(/•\s*(\d{1,2}h\d{0,2})/g);
+            const slots = slotMatches ? slotMatches.map((s: string) => s.replace("•", "").trim()) : [];
+            contextAfterTools = { ...contextAfterTools, step: "choose_slot", availableSlots: slots };
           }
           if (fnName === "book_appointment" && result.content.includes("Rendez-vous confirmé")) {
-            contextAfterTools = { ...contextAfterTools, step: "booking_confirmed" };
+            contextAfterTools = { ...contextAfterTools, step: "booking_confirmed", availableSlots: undefined };
           }
         }
 
@@ -660,8 +663,17 @@ function getQuickRepliesForState(context: ConversationContext): QuickReply[] {
   const intent = context.intent;
   const step = context.step;
 
-  // Slots just shown — let user type the chosen slot
+  // Slots just shown — offer the actual available slots as buttons
   if (step === "choose_slot") {
+    const slots = context.availableSlots;
+    if (slots && slots.length > 0) {
+      return slots.map((slot, i) => ({
+        id: `slot-${i}`,
+        label: slot,
+        action: "send_text",
+        payload: {},
+      }));
+    }
     return [];
   }
 
