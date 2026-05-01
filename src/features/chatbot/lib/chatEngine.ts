@@ -113,65 +113,6 @@ export async function processMessage(
   // Update context based on user input (simple NLP)
   let updatedContext = updateContext(userMessage, context);
 
-  // FORCE: if we have service + date but no slots checked yet, call check_availability directly
-  // This ensures the user sees available slots BEFORE being asked for name/phone
-  if (updatedContext.service && updatedContext.preferredDate && !updatedContext.availableSlots) {
-    const provider = await getCalendarProvider(config.calendarProvider, config.calendarConfig);
-    const targetDate = parseAsZurichDate(updatedContext.preferredDate);
-    targetDate.setHours(0, 0, 0, 0);
-    const endDate = new Date(targetDate);
-    endDate.setDate(endDate.getDate() + 7);
-
-    try {
-      const slots = await provider.getAvailableSlots(targetDate, endDate, 60);
-      const availableSlots = slots.filter((s) => s.available).slice(0, 5);
-
-      if (availableSlots.length === 0) {
-        return {
-          message: {
-            id: `msg-${Date.now()}`,
-            role: "assistant",
-            content: "Je suis désolée, aucun créneau n'est disponible pour cette période. Pourriez-vous choisir une autre date ?",
-            timestamp: new Date().toISOString(),
-            quickReplies: [
-              { id: "today", label: "Aujourd'hui", action: "set_date", payload: { date: "today" } },
-              { id: "tomorrow", label: "Demain", action: "set_date", payload: { date: "tomorrow" } },
-            ],
-          },
-          context: { ...updatedContext, preferredDate: undefined, step: "ask_date", availableSlots: undefined },
-        };
-      }
-
-      const slotLabels = availableSlots.map((s) => {
-        const d = new Date(s.start);
-        return `${d.getHours()}h${String(d.getMinutes()).padStart(2, "0")}`;
-      });
-
-      return {
-        message: {
-          id: `msg-${Date.now()}`,
-          role: "assistant",
-          content: `Voici les créneaux disponibles pour votre ${updatedContext.service} :
-
-${slotLabels.join(", ")}
-
-Quel créneau préférez-vous ?`,
-          timestamp: new Date().toISOString(),
-          quickReplies: slotLabels.map((label, i) => ({
-            id: `slot-${i}`,
-            label,
-            action: "send_text",
-            payload: {},
-          })),
-        },
-        context: { ...updatedContext, step: "choose_slot", availableSlots: slotLabels },
-      };
-    } catch (error) {
-      console.error("[ChatEngine] Forced availability check failed:", error);
-      // Continue to AI fallback
-    }
-  }
-
   // Build messages for OpenAI
   const messages = buildMessages(config.systemPrompt, history, userMessage, updatedContext);
 
@@ -345,22 +286,27 @@ function buildMessages(
 
   const enrichedSystemPrompt = `${systemPrompt}${contextBlock}
 
-INSTRUCTIONS SUPPLEMENTAIRES POUR CETTE RÉPONSE :
-- Sois concise, chaleureuse et directe.
-- Pose UNE SEULE question à la fois.
-- Ne utilise jamais de markdown (** * __ _).
-- Ne numérote jamais tes listes.
-- Utilise des phrases courtes et naturelles.
-- Si une information est déjà collectée (voir ci-dessus), passe à la suivante.
-- Guide progressivement l'utilisateur vers la prise de rendez-vous en collectant : service → date → VÉRIFIER CRÉNEAUX → choisir créneau → prénom → téléphone. NE JAMAIS demander le prénom avant que le client ait choisi un créneau.
-- "Demain" = le lendemain d'aujourd'hui. "Aujourd'hui" = ${todayStr}.
-- Quand l'utilisateur te donne une date (ex: "13 mai", "demain", "mardi"), tu DOIS appeler l'outil check_availability pour vérifier les créneaux. Ne commente JAMAIS si le salon est ouvert ou fermé — c'est l'outil qui le sait.
-- Si l'utilisateur écrit en langage naturel (ex: "J'aimerais une coupe homme le 15 mai"), extrais le service et la date, puis appelle IMMÉDIATEMENT check_availability pour montrer les créneaux disponibles.
-- Si la date est un jour fermé, l'outil te le dira. Propose alors gentiment une autre date.
-- Quand l'outil check_availability te retourne des créneaux, affiche UNIQUEMENT ces créneaux au client. N'invente JAMAIS d'autres créneaux.
-- N'utilise JAMAIS l'heure "12h00" comme créneau proposé. La date à 12h00 est juste une référence, pas un créneau choisi.
+OBJECTIF :
+Tu es l'assistante digitale du salon. Ton but est d'aider chaque client avec chaleur et efficacité : répondre à ses questions sur le salon, ou le guider vers la prise d'un rendez-vous confirmé dans le calendrier. Tu dois accomplir cela en utilisant les outils à ta disposition quand c'est nécessaire.
 
-INSTRUCTION CRITIQUE — BOUTONS DE RÉPONSE :
+CONTRAINTES STRICTES :
+- Sois concise, chaleureuse et directe. Maximum 2-3 phrases par message.
+- Pose UNE SEULE question à la fois.
+- Ne utilise jamais de markdown (** * __ _). Ne numérote jamais tes listes.
+- Si une information est déjà collectée (voir ci-dessus), passe à la suivante. Ne redemande JAMAIS une info déjà connue.
+- Tu ne connais PAS les disponibilités réelles du salon. Seul l'outil check_availability les connaît. Tu ne dois JAMAIS inventer de créneaux.
+- "Demain" = le lendemain d'aujourd'hui. "Aujourd'hui" = ${todayStr}.
+- N'utilise JAMAIS l'heure "12h00" comme créneau proposé. C'est une référence interne, pas un vrai créneau.
+
+QUAND UTILISER LES OUTILS :
+- Utilise get_services, get_hours, get_address quand le client pose une question correspondante.
+- Utilise check_availability dès que le client mentionne une date et un service (ou a déjà un service de choisi). Tu ne dois PAS répondre en texte avant d'avoir les résultats de cet outil — appelle-le immédiatement.
+- Utilise book_appointment UNIQUEMENT quand le client a choisi un créneau précis ET que tu as déjà son prénom, son téléphone, le service et la date/heure exacte. Ne l'appelle jamais avec des informations manquantes.
+
+DÉFINITION DE "TERMINÉ" POUR UN RENDEZ-VOUS :
+Un rendez-vous est complètement réservé quand book_appointment a retourné une confirmation. Avant cela, si des informations manquent (service, date, créneau choisi, prénom, téléphone), le processus n'est PAS terminé. Guide le client calmement jusqu'à ce que tout soit collecté.
+
+CONTRAT DE SORTIE :
 À la toute fin de ta réponse, sur une ligne séparée, ajoute exactement :
 QUICK_REPLIES: option1 | option2 | option3
 
@@ -390,50 +336,46 @@ Si aucun bouton n'est pertinent, n'ajoute PAS cette ligne.`;
   return messages;
 }
 
-function getToolDefinitions(context: ConversationContext): OpenAI.Chat.ChatCompletionTool[] {
+function getToolDefinitions(_context: ConversationContext): OpenAI.Chat.ChatCompletionTool[] {
   const tools: OpenAI.Chat.ChatCompletionTool[] = [
     {
       type: "function",
       function: {
         name: "get_services",
-        description: "Obtenir la liste des services et tarifs",
-        parameters: { type: "object", properties: {} },
+        description: "Obtenir la liste des services et tarifs du salon",
+        parameters: { type: "object", properties: {}, additionalProperties: false },
+        strict: true,
       },
     },
     {
       type: "function",
       function: {
         name: "get_hours",
-        description: "Obtenir les horaires d'ouverture",
-        parameters: { type: "object", properties: {} },
+        description: "Obtenir les horaires d'ouverture du salon",
+        parameters: { type: "object", properties: {}, additionalProperties: false },
+        strict: true,
       },
     },
     {
       type: "function",
       function: {
         name: "get_address",
-        description: "Obtenir l'adresse du salon",
-        parameters: { type: "object", properties: {} },
+        description: "Obtenir l'adresse et le téléphone du salon",
+        parameters: { type: "object", properties: {}, additionalProperties: false },
+        strict: true,
       },
     },
-  ];
-
-  // Expose check_availability as soon as service + date are known
-  // so the AI can show real slots before collecting name/phone
-  const canCheckAvailability = context.service && context.preferredDate;
-
-  if (canCheckAvailability) {
-    tools.push({
+    {
       type: "function",
       function: {
         name: "check_availability",
-        description: "Vérifier les créneaux disponibles pour un rendez-vous dans les 7 prochains jours",
+        description: "Vérifier les créneaux horaires disponibles pour un rendez-vous dans les 7 prochains jours à partir d'une date donnée. Cet outil retourne les vrais créneaux libres — tu ne dois JAMAIS en inventer d'autres.",
         parameters: {
           type: "object",
           properties: {
             date: {
               type: "string",
-              description: "Date souhaitée (format ISO ou texte relatif comme 'demain', 'mardi prochain')",
+              description: "Date souhaitée au format ISO (YYYY-MM-DD) ou texte relatif comme 'demain', 'mardi prochain'",
             },
             service: {
               type: "string",
@@ -441,35 +383,33 @@ function getToolDefinitions(context: ConversationContext): OpenAI.Chat.ChatCompl
             },
           },
           required: ["date"],
+          additionalProperties: false,
         },
+        strict: true,
       },
-    });
-  }
-
-  // Only expose book_appointment when ALL required info is collected
-  const canBook = context.service && context.preferredDate && context.name && context.phone;
-
-  if (canBook) {
-    tools.push({
+    },
+    {
       type: "function",
       function: {
         name: "book_appointment",
-        description: "Créer un rendez-vous dans le calendrier. NE JAMAIS appeler sans avoir toutes les infos requises.",
+        description: "Créer un rendez-vous dans le calendrier Google. NE JAMAIS appeler sans avoir TOUTES les informations requises : prénom, téléphone, service, et date+heure exactes choisies par le client.",
         parameters: {
           type: "object",
           properties: {
             name: { type: "string", description: "Prénom du client" },
             phone: { type: "string", description: "Numéro de téléphone" },
-            email: { type: "string", description: "Email du client (optionnel)" },
+            email: { type: ["string", "null"], description: "Email du client (optionnel)" },
             service: { type: "string", description: "Service choisi" },
             date: { type: "string", description: "Date et heure du rendez-vous (ISO). Ex: 2026-04-29T10:00:00.000Z" },
-            notes: { type: "string", description: "Notes éventuelles" },
+            notes: { type: ["string", "null"], description: "Notes éventuelles" },
           },
           required: ["name", "phone", "service", "date"],
+          additionalProperties: false,
         },
+        strict: true,
       },
-    });
-  }
+    },
+  ];
 
   return tools;
 }
