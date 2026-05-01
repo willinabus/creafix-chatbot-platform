@@ -59,7 +59,7 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
               role: "assistant",
               content: result.data.message.content,
               timestamp: new Date().toISOString(),
-              quickReplies: defaultChatbotConfig.content.quickReplies,
+              quickReplies: result.data.message.quickReplies,
             };
             setMessages([assistantMessage]);
             setContext(result.data.context);

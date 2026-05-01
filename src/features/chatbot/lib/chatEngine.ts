@@ -48,7 +48,7 @@ export async function processMessage(
         role: "assistant",
         content: config.branding.welcomeMessage,
         timestamp: new Date().toISOString(),
-        quickReplies: defaultChatbotConfig.content.quickReplies,
+        quickReplies: config.content.quickReplies,
       },
       context: { collectedData: {} },
     };
@@ -107,7 +107,7 @@ export async function processMessage(
         const toolCalls = choice.message.tool_calls;
 
         for (const toolCall of toolCalls) {
-          const result = await executeTool(toolCall, contextAfterTools, config.calendarProvider, config.calendarConfig);
+          const result = await executeTool(toolCall, contextAfterTools, config.calendarProvider, config.calendarConfig, config);
           toolResults.push(result);
           const fnName = (toolCall as { function: { name: string } }).function.name;
           if (fnName === "check_availability" && !result.content.startsWith("Aucun créneau") && !result.content.startsWith("Erreur")) {
@@ -365,7 +365,8 @@ async function executeTool(
   toolCall: OpenAI.Chat.ChatCompletionMessageToolCall,
   context: ConversationContext,
   calendarProviderConfig?: string,
-  calendarConfig?: Record<string, unknown>
+  calendarConfig?: Record<string, unknown>,
+  config?: Awaited<ReturnType<typeof getChatbotConfig>>
 ): Promise<ToolResult> {
   const toolCallFn = (toolCall as { function: { name: string; arguments: string } }).function;
   const args = safelyParseJSON(toolCallFn.arguments, {}) as Record<string, unknown>;
@@ -441,9 +442,16 @@ async function executeTool(
     }
 
     case "get_services": {
-      const services = defaultChatbotConfig.content.services;
+      const services = config?.content.services ?? defaultChatbotConfig.content.services;
+      if (services.length === 0) {
+        return {
+          toolCallId: toolCall.id,
+          role: "tool",
+          content: "Aucun service n'est configuré pour le moment.",
+        };
+      }
       const servicesText = services
-        .map((s) => `${s.name}: ${s.description} (${s.price || "Sur devis"})`)
+        .map((s: { name: string; description: string; price?: string }) => `${s.name}: ${s.description} (${s.price || "Sur devis"})`)
         .join("\n");
       return {
         toolCallId: toolCall.id,
@@ -456,7 +464,7 @@ async function executeTool(
       return {
         toolCallId: toolCall.id,
         role: "tool",
-        content: "Horaires : Mardi-Vendredi 9h-18h, Samedi 9h-16h. Fermé dimanche et lundi.",
+        content: `Horaires : ${config?.content.hours ?? defaultChatbotConfig.content.hours}`,
       };
     }
 
@@ -464,7 +472,7 @@ async function executeTool(
       return {
         toolCallId: toolCall.id,
         role: "tool",
-        content: "Adresse : Rue de Lausanne 25, 1201 Genève (à côté de la gare Cornavin).",
+        content: `Adresse : ${config?.content.address ?? defaultChatbotConfig.content.address}\nTéléphone : ${config?.content.contact ?? defaultChatbotConfig.content.contact}`,
       };
     }
 

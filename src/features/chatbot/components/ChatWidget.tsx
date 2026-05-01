@@ -106,6 +106,12 @@ export function ChatWidget({ isOpen: controlledOpen, onToggle, embedded = false,
             window.parent.postMessage({ type: "CF_CHATBOT_CLOSE" }, "*");
           }
         }}
+        headerColor={config.style.headerColor}
+        textColor={config.style.textColor}
+        iconColor={config.style.iconColor}
+        buttonColor={config.style.buttonColor}
+        primaryColor={config.style.primaryColor}
+        fontFamily={config.style.fontFamily}
       />
         <div
           className="flex-1 overflow-y-auto"
@@ -120,6 +126,7 @@ export function ChatWidget({ isOpen: controlledOpen, onToggle, embedded = false,
               message={msg}
               onQuickReply={handleQuickReply}
               isLoading={isLoading && msg === messages[messages.length - 1] && msg.role === "assistant"}
+              style={config.style}
             />
           ))}
           {isLoading && messages[messages.length - 1]?.role === "user" && (
@@ -132,6 +139,7 @@ export function ChatWidget({ isOpen: controlledOpen, onToggle, embedded = false,
               }}
               onQuickReply={() => {}}
               isLoading={true}
+              style={config.style}
             />
           )}
           <div ref={messagesEndRef} />
@@ -140,6 +148,10 @@ export function ChatWidget({ isOpen: controlledOpen, onToggle, embedded = false,
           onSend={handleSend}
           disabled={isLoading}
           placeholder={config.branding.inputPlaceholder}
+          buttonColor={config.style.buttonColor}
+          primaryColor={config.style.primaryColor}
+          accentColor={config.style.accentColor}
+          fontFamily={config.style.fontFamily}
         />
       </div>
     );
