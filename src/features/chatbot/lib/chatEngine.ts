@@ -123,9 +123,15 @@ export async function processMessage(
 
   if (isOpenAIConfigured()) {
     try {
+      // Force check_availability when we have service + date but haven't checked slots yet
+      const mustCheckSlots = updatedContext.service && updatedContext.preferredDate && !updatedContext.availableSlots;
+
       const completion = await createChatCompletion({
         messages,
         tools: getToolDefinitions(updatedContext),
+        toolChoice: mustCheckSlots
+          ? { type: "function", function: { name: "check_availability" } }
+          : "auto",
       });
 
       const choice = completion.choices[0];
@@ -298,10 +304,13 @@ CONTRAINTES STRICTES :
 - "Demain" = le lendemain d'aujourd'hui. "Aujourd'hui" = ${todayStr}.
 - N'utilise JAMAIS l'heure "12h00" comme créneau proposé. C'est une référence interne, pas un vrai créneau.
 
-QUAND UTILISER LES OUTILS :
+QUAND UTILISER LES OUTILS — RÈGLES OBLIGATOIRES :
 - Utilise get_services, get_hours, get_address quand le client pose une question correspondante.
-- Utilise check_availability dès que le client mentionne une date et un service (ou a déjà un service de choisi). Tu ne dois PAS répondre en texte avant d'avoir les résultats de cet outil — appelle-le immédiatement.
-- Utilise book_appointment UNIQUEMENT quand le client a choisi un créneau précis ET que tu as déjà son prénom, son téléphone, le service et la date/heure exacte. Ne l'appelle jamais avec des informations manquantes.
+- Si le client a déjà choisi un service ET mentionné une date → tu DOIS appeler check_availability IMMÉDIATEMENT. Tu ne dois PAS répondre en texte avant d'avoir les résultats.
+- Si check_availability retourne des créneaux → montre UNIQUEMENT ces créneaux au client et demande-lui d'en choisir un.
+- Si check_availability retourne "Aucun créneau" → propose une autre date et appelle à nouveau check_availability.
+- Tu ne dois JAMAIS demander le prénom ou le téléphone AVANT d'avoir appelé check_availability et montré les créneaux disponibles au client.
+- Utilise book_appointment UNIQUEMENT quand le client a choisi un créneau précis ET que tu as déjà son prénom, son téléphone, le service et la date/heure exacte.
 
 DÉFINITION DE "TERMINÉ" POUR UN RENDEZ-VOUS :
 Un rendez-vous est complètement réservé quand book_appointment a retourné une confirmation. Avant cela, si des informations manquent (service, date, créneau choisi, prénom, téléphone), le processus n'est PAS terminé. Guide le client calmement jusqu'à ce que tout soit collecté.
@@ -708,9 +717,10 @@ function updateContext(message: string, context: ConversationContext): Conversat
       const reservedWords = ["demain", "aujourd'hui", "today", "tomorrow", "oui", "non", "ok", "salut", "bonjour", "merci", "cette semaine", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"];
       const trimmed = message.trim().toLowerCase();
       const isReserved = reservedWords.includes(trimmed);
-      // When at ask_name step, accept any simple word as a name (but not reserved words)
+      // Accept any simple word as a name when at ask_name step, OR when we're in booking flow
       const isSimpleName = trimmed.length > 0 && trimmed.length < 30 && !/\d/.test(trimmed) && !message.includes(" ") && !isReserved;
-      if (updated.step === "ask_name" && isSimpleName) {
+      const inBookingFlow = updated.intent === "booking" && updated.service && updated.preferredDate;
+      if ((updated.step === "ask_name" || inBookingFlow) && isSimpleName) {
         updated.name = message.trim().charAt(0).toUpperCase() + message.trim().slice(1).toLowerCase();
       } else {
         const namePatterns = [

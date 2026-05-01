@@ -38,6 +38,7 @@ export const OPENAI_CONFIG = {
 export interface ChatCompletionOptions {
   messages: OpenAI.Chat.ChatCompletionMessageParam[];
   tools?: OpenAI.Chat.ChatCompletionTool[];
+  toolChoice?: OpenAI.Chat.ChatCompletionToolChoiceOption;
   temperature?: number;
   model?: string;
 }
@@ -72,7 +73,7 @@ export async function createChatCompletion(options: ChatCompletionOptions) {
 
   if (options.tools && options.tools.length > 0) {
     body.tools = options.tools;
-    body.tool_choice = "auto";
+    body.tool_choice = options.toolChoice ?? "auto";
     // GPT-5 benefits from parallel tool calling; keep default unless issues arise
     if (isGpt5) {
       body.parallel_tool_calls = true;
