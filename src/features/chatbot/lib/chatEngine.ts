@@ -111,7 +111,66 @@ export async function processMessage(
   }
 
   // Update context based on user input (simple NLP)
-  const updatedContext = updateContext(userMessage, context);
+  let updatedContext = updateContext(userMessage, context);
+
+  // FORCE: if we have service + date but no slots checked yet, call check_availability directly
+  // This ensures the user sees available slots BEFORE being asked for name/phone
+  if (updatedContext.service && updatedContext.preferredDate && !updatedContext.availableSlots) {
+    const provider = await getCalendarProvider(config.calendarProvider, config.calendarConfig);
+    const targetDate = parseAsZurichDate(updatedContext.preferredDate);
+    targetDate.setHours(0, 0, 0, 0);
+    const endDate = new Date(targetDate);
+    endDate.setDate(endDate.getDate() + 7);
+
+    try {
+      const slots = await provider.getAvailableSlots(targetDate, endDate, 60);
+      const availableSlots = slots.filter((s) => s.available).slice(0, 5);
+
+      if (availableSlots.length === 0) {
+        return {
+          message: {
+            id: `msg-${Date.now()}`,
+            role: "assistant",
+            content: "Je suis désolée, aucun créneau n'est disponible pour cette période. Pourriez-vous choisir une autre date ?",
+            timestamp: new Date().toISOString(),
+            quickReplies: [
+              { id: "today", label: "Aujourd'hui", action: "set_date", payload: { date: "today" } },
+              { id: "tomorrow", label: "Demain", action: "set_date", payload: { date: "tomorrow" } },
+            ],
+          },
+          context: { ...updatedContext, preferredDate: undefined, step: "ask_date", availableSlots: undefined },
+        };
+      }
+
+      const slotLabels = availableSlots.map((s) => {
+        const d = new Date(s.start);
+        return `${d.getHours()}h${String(d.getMinutes()).padStart(2, "0")}`;
+      });
+
+      return {
+        message: {
+          id: `msg-${Date.now()}`,
+          role: "assistant",
+          content: `Voici les créneaux disponibles pour votre ${updatedContext.service} :
+
+${slotLabels.join(", ")}
+
+Quel créneau préférez-vous ?`,
+          timestamp: new Date().toISOString(),
+          quickReplies: slotLabels.map((label, i) => ({
+            id: `slot-${i}`,
+            label,
+            action: "send_text",
+            payload: {},
+          })),
+        },
+        context: { ...updatedContext, step: "choose_slot", availableSlots: slotLabels },
+      };
+    } catch (error) {
+      console.error("[ChatEngine] Forced availability check failed:", error);
+      // Continue to AI fallback
+    }
+  }
 
   // Build messages for OpenAI
   const messages = buildMessages(config.systemPrompt, history, userMessage, updatedContext);
@@ -293,7 +352,7 @@ INSTRUCTIONS SUPPLEMENTAIRES POUR CETTE RÉPONSE :
 - Ne numérote jamais tes listes.
 - Utilise des phrases courtes et naturelles.
 - Si une information est déjà collectée (voir ci-dessus), passe à la suivante.
-- Guide progressivement l'utilisateur vers la prise de rendez-vous en collectant : service → date → prénom → téléphone → créneau.
+- Guide progressivement l'utilisateur vers la prise de rendez-vous en collectant : service → date → VÉRIFIER CRÉNEAUX → choisir créneau → prénom → téléphone. NE JAMAIS demander le prénom avant que le client ait choisi un créneau.
 - "Demain" = le lendemain d'aujourd'hui. "Aujourd'hui" = ${todayStr}.
 - Quand l'utilisateur te donne une date (ex: "13 mai", "demain", "mardi"), tu DOIS appeler l'outil check_availability pour vérifier les créneaux. Ne commente JAMAIS si le salon est ouvert ou fermé — c'est l'outil qui le sait.
 - Si la date est un jour fermé, l'outil te le dira. Propose alors gentiment une autre date.
@@ -541,6 +600,8 @@ async function executeTool(
 function recalcStep(ctx: ConversationContext): string {
   if (!ctx.service) return "ask_service";
   if (!ctx.preferredDate) return "ask_date";
+  // If date is set but no slot chosen yet, stay in choose_slot
+  if (!ctx.preferredTime) return "choose_slot";
   if (!ctx.name) return "ask_name";
   if (!ctx.phone) return "ask_phone";
   return "confirm_booking";
