@@ -223,11 +223,13 @@ export class GoogleMcpCalendarProvider implements CalendarProvider {
 
     const data = await response.json();
 
+    // Return the original Zurich-local startDate so downstream formatting
+    // (e.g. formatDateTime) shows the correct local time instead of UTC.
     return {
       id: data.id,
       title: data.summary,
-      start: new Date(data.start.dateTime),
-      end: new Date(data.end.dateTime),
+      start: startDate,
+      end: endDate,
       description: data.description,
       attendees: data.attendees?.map((a: { email: string }) => a.email),
     };
