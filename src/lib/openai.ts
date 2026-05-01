@@ -1,6 +1,6 @@
 /**
  * OpenAI client configuration
- * Supports standard chat models (gpt-4o-mini, gpt-4o) and reasoning models (o1, o3)
+ * Supports standard chat models and reasoning chat models (o-series, GPT-5)
  */
 
 import OpenAI from "openai";
@@ -30,7 +30,7 @@ function isGpt5Model(model: string): boolean {
 }
 
 export const OPENAI_CONFIG = {
-  model: APP_CONFIG.defaultModel,
+  model: process.env.OPENAI_MODEL || APP_CONFIG.defaultModel,
   temperature: APP_CONFIG.defaultTemperature,
   maxTokens: APP_CONFIG.maxTokens,
 } as const;
@@ -41,6 +41,9 @@ export interface ChatCompletionOptions {
   toolChoice?: OpenAI.Chat.ChatCompletionToolChoiceOption;
   temperature?: number;
   model?: string;
+  maxTokens?: number;
+  reasoningEffort?: OpenAI.Chat.ChatCompletionReasoningEffort;
+  responseFormat?: OpenAI.Chat.ChatCompletionCreateParamsNonStreaming["response_format"];
 }
 
 export async function createChatCompletion(options: ChatCompletionOptions) {
@@ -51,30 +54,29 @@ export async function createChatCompletion(options: ChatCompletionOptions) {
   const model = options.model || OPENAI_CONFIG.model;
   const useReasoning = isReasoningModel(model);
   const isGpt5 = isGpt5Model(model);
+  const maxTokens = options.maxTokens ?? OPENAI_CONFIG.maxTokens;
 
-  const body: any = {
+  const body: OpenAI.Chat.ChatCompletionCreateParamsNonStreaming = {
     model,
     messages: options.messages,
   };
 
-  if (isGpt5) {
-    // GPT-5 models use max_output_tokens and reasoning effort
-    body.max_output_tokens = OPENAI_CONFIG.maxTokens;
-    body.reasoning = { effort: "medium" };
-    // GPT-5 does not use temperature — reasoning effort controls variability
-  } else if (useReasoning) {
-    // Legacy reasoning models (o1, o3)
-    body.max_completion_tokens = OPENAI_CONFIG.maxTokens;
-    body.reasoning_effort = "medium";
+  if (useReasoning) {
+    // Chat Completions reasoning models use max_completion_tokens + reasoning_effort.
+    body.max_completion_tokens = maxTokens;
+    body.reasoning_effort = options.reasoningEffort ?? "medium";
   } else {
-    body.max_tokens = OPENAI_CONFIG.maxTokens;
+    body.max_tokens = maxTokens;
     body.temperature = options.temperature ?? OPENAI_CONFIG.temperature;
+  }
+
+  if (options.responseFormat) {
+    body.response_format = options.responseFormat;
   }
 
   if (options.tools && options.tools.length > 0) {
     body.tools = options.tools;
     body.tool_choice = options.toolChoice ?? "auto";
-    // GPT-5 benefits from parallel tool calling; keep default unless issues arise
     if (isGpt5) {
       body.parallel_tool_calls = true;
     }

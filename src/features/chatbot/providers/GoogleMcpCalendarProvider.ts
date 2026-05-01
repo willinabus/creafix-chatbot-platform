@@ -252,13 +252,22 @@ export class GoogleMcpCalendarProvider implements CalendarProvider {
       );
     }
 
-    const data = await response.json();
+    const data = await response.json() as {
+      items?: Array<{
+        id: string;
+        summary?: string;
+        start: { dateTime?: string; date?: string };
+        end: { dateTime?: string; date?: string };
+        description?: string;
+        attendees?: Array<{ email: string }>;
+      }>;
+    };
 
-    return (data.items || []).map((item: any) => ({
+    return (data.items || []).map((item) => ({
       id: item.id,
-      title: item.summary,
-      start: new Date(item.start.dateTime),
-      end: new Date(item.end.dateTime),
+      title: item.summary || "Rendez-vous",
+      start: new Date(item.start.dateTime || item.start.date || startDate),
+      end: new Date(item.end.dateTime || item.end.date || endDate),
       description: item.description,
       attendees: item.attendees?.map((a: { email: string }) => a.email),
     }));

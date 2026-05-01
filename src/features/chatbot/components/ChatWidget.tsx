@@ -14,6 +14,7 @@ import { ChatMessage } from "./ChatMessage";
 import { ChatInput } from "./ChatInput";
 import { QuickReply, ChatbotConfig } from "@/features/chatbot/types";
 import { defaultChatbotConfig } from "@/features/chatbot/config/chatbotConfig";
+import { getContrastText } from "@/lib/colors";
 
 interface ChatWidgetProps {
   isOpen?: boolean;
@@ -30,9 +31,11 @@ export function ChatWidget({ isOpen: controlledOpen, onToggle, embedded = false,
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const { messages, isLoading, sendMessage, sendQuickReply, resetConversation } = useChat({ botId });
+  const { messages, isLoading, sendMessage, sendQuickReply } = useChat({ botId });
 
   const config = propConfig || dynamicConfig || defaultChatbotConfig;
+  const fabColor = config.style.buttonColor || config.style.primaryColor || "#0c0b09";
+  const fabTextColor = getContrastText(fabColor);
 
   // Load config from DB when botId is provided but no propConfig
   useEffect(() => {
@@ -92,7 +95,7 @@ export function ChatWidget({ isOpen: controlledOpen, onToggle, embedded = false,
           display: "flex",
           flexDirection: "column",
           background: config.style.widgetBgColor,
-          border: "1px solid rgba(17,17,17,0.10)",
+          border: `1px solid ${config.style.borderColor || "rgba(17,17,17,0.10)"}`,
           borderRadius: config.style.borderRadius,
           overflow: "hidden",
           fontFamily: config.style.fontFamily,
@@ -152,6 +155,10 @@ export function ChatWidget({ isOpen: controlledOpen, onToggle, embedded = false,
           primaryColor={config.style.primaryColor}
           accentColor={config.style.accentColor}
           fontFamily={config.style.fontFamily}
+          surfaceColor={config.style.widgetBgColor}
+          textColor={config.style.textColor}
+          borderColor={config.style.borderColor}
+          buttonRadius={config.style.buttonRadius}
         />
       </div>
     );
@@ -175,15 +182,15 @@ export function ChatWidget({ isOpen: controlledOpen, onToggle, embedded = false,
               left: config.style.widgetPosition === "left" ? "24px" : "auto",
               width: "56px",
               height: "56px",
-              background: "#0c0b09",
+              background: fabColor,
               border: "none",
-              borderRadius: "4px",
+              borderRadius: config.style.borderRadius,
               cursor: "pointer",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
-              color: "#F5F3EE",
+              boxShadow: config.style.shadow,
+              color: fabTextColor,
             }}
           >
             <MessageSquare size={24} />
@@ -210,7 +217,7 @@ export function ChatWidget({ isOpen: controlledOpen, onToggle, embedded = false,
               height: config.style.maxHeight,
               maxHeight: "calc(100vh - 48px)",
               background: config.style.widgetBgColor,
-              border: "1px solid rgba(17,17,17,0.10)",
+              border: `1px solid ${config.style.borderColor || "rgba(17,17,17,0.10)"}`,
               borderRadius: config.style.borderRadius,
               overflow: "hidden",
               boxShadow: config.style.shadow,
@@ -221,6 +228,12 @@ export function ChatWidget({ isOpen: controlledOpen, onToggle, embedded = false,
               title={config.branding.name}
               subtitle={config.branding.companyName}
               onClose={handleToggle}
+              headerColor={config.style.headerColor}
+              textColor={config.style.textColor}
+              iconColor={config.style.iconColor}
+              buttonColor={config.style.buttonColor}
+              primaryColor={config.style.primaryColor}
+              fontFamily={config.style.fontFamily}
             />
             <div
               className="flex-1 overflow-y-auto"
@@ -235,6 +248,7 @@ export function ChatWidget({ isOpen: controlledOpen, onToggle, embedded = false,
                   message={msg}
                   onQuickReply={handleQuickReply}
                   isLoading={isLoading && msg === messages[messages.length - 1] && msg.role === "assistant"}
+                  style={config.style}
                 />
               ))}
               {isLoading && messages[messages.length - 1]?.role === "user" && (
@@ -247,6 +261,7 @@ export function ChatWidget({ isOpen: controlledOpen, onToggle, embedded = false,
                   }}
                   onQuickReply={() => {}}
                   isLoading={true}
+                  style={config.style}
                 />
               )}
               <div ref={messagesEndRef} />
@@ -255,6 +270,14 @@ export function ChatWidget({ isOpen: controlledOpen, onToggle, embedded = false,
               onSend={handleSend}
               disabled={isLoading}
               placeholder={config.branding.inputPlaceholder}
+              buttonColor={config.style.buttonColor}
+              primaryColor={config.style.primaryColor}
+              accentColor={config.style.accentColor}
+              fontFamily={config.style.fontFamily}
+              surfaceColor={config.style.widgetBgColor}
+              textColor={config.style.textColor}
+              borderColor={config.style.borderColor}
+              buttonRadius={config.style.buttonRadius}
             />
           </motion.div>
         )}

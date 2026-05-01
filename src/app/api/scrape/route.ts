@@ -7,18 +7,47 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createChatCompletion, isOpenAIConfigured } from "@/lib/openai";
 
+type Rgb = { r: number; g: number; b: number };
+type FirecrawlBranding = {
+  logo?: string;
+  images?: { logo?: string };
+  colors?: Record<string, string | undefined>;
+};
+type FirecrawlData = {
+  markdown?: string;
+  branding?: FirecrawlBranding | null;
+  images?: string[];
+};
+type GeneratedScrapeConfig = {
+  name?: string;
+  companyName?: string;
+  tagline?: string;
+  welcomeMessage?: string;
+  inputPlaceholder?: string;
+  hours?: string;
+  address?: string;
+  contact?: string;
+  services?: Array<{ name: string; description: string; price?: string }>;
+  faq?: Array<{ question: string; answer: string }>;
+  quickReplies?: Array<{ id: string; label: string; action: string; payload?: Record<string, unknown> }>;
+  systemPrompt?: string;
+  logoUrl?: string;
+  style?: Record<string, string>;
+};
+
 /**
  * Color coherence helpers
  * Ensures imported colors have sufficient contrast and no black-on-black
  */
 
-function parseAnyColor(c: string): { r: number; g: number; b: number } | null {
+function parseAnyColor(c: string): Rgb | null {
   if (!c) return null;
   c = c.trim().toLowerCase();
   // Hex
   if (c.startsWith("#")) {
     const clean = c.replace("#", "");
     const full = clean.length === 3 ? clean.split("").map((x) => x + x).join("") : clean;
+    if (!/^[0-9a-f]{6}$/i.test(full)) return null;
     const bigint = parseInt(full, 16);
     if (isNaN(bigint)) return null;
     return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
@@ -40,12 +69,12 @@ function parseAnyColor(c: string): { r: number; g: number; b: number } | null {
   return null;
 }
 
-function rgbToHex({ r, g, b }: { r: number; g: number; b: number }) {
+function rgbToHex({ r, g, b }: Rgb) {
   const toHex = (n: number) => Math.max(0, Math.min(255, n)).toString(16).padStart(2, "0");
   return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
 }
 
-function luminance(rgb: { r: number; g: number; b: number }) {
+function luminance(rgb: Rgb) {
   const a = [rgb.r, rgb.g, rgb.b].map((v) => {
     v /= 255;
     return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
@@ -53,17 +82,17 @@ function luminance(rgb: { r: number; g: number; b: number }) {
   return a[0] * 0.2126 + a[1] * 0.7152 + a[2] * 0.0722;
 }
 
-function isDarkColor(rgb: { r: number; g: number; b: number }) {
+function isDarkColor(rgb: Rgb) {
   return luminance(rgb) < 0.4;
 }
 
-function contrastRatioRgb(a: { r: number; g: number; b: number }, b: { r: number; g: number; b: number }) {
+function contrastRatioRgb(a: Rgb, b: Rgb) {
   const l1 = luminance(a) + 0.05;
   const l2 = luminance(b) + 0.05;
   return l1 > l2 ? l1 / l2 : l2 / l1;
 }
 
-function lightenRgb(rgb: { r: number; g: number; b: number }, amount: number) {
+function lightenRgb(rgb: Rgb, amount: number) {
   return {
     r: Math.min(255, Math.round(rgb.r + (255 - rgb.r) * amount)),
     g: Math.min(255, Math.round(rgb.g + (255 - rgb.g) * amount)),
@@ -71,7 +100,7 @@ function lightenRgb(rgb: { r: number; g: number; b: number }, amount: number) {
   };
 }
 
-function darkenRgb(rgb: { r: number; g: number; b: number }, amount: number) {
+function darkenRgb(rgb: Rgb, amount: number) {
   return {
     r: Math.max(0, Math.round(rgb.r * (1 - amount))),
     g: Math.max(0, Math.round(rgb.g * (1 - amount))),
@@ -98,12 +127,12 @@ function buildCoherentTheme(style: Record<string, string>) {
 
   // Extract the site's background color (from Firecrawl or generated)
   const bgHex = s.widgetBgColor || "#FCFBF8";
-  const bgRgb = parseAnyColor(bgHex)!;
+  const bgRgb = parseAnyColor(bgHex) ?? parseAnyColor("#FCFBF8")!;
   const bgIsDark = isDarkColor(bgRgb);
 
   // The site's brand color (primary)
   const brandHex = s.primaryColor || s.accentColor || s.buttonColor || (bgIsDark ? "#F5F3EE" : "#111111");
-  const brandRgb = parseAnyColor(brandHex)!;
+  const brandRgb = parseAnyColor(brandHex) ?? parseAnyColor(bgIsDark ? "#F5F3EE" : "#111111")!;
   const brandIsDark = isDarkColor(brandRgb);
 
   // === BUILD THEME BASED ON SITE TONE ===
@@ -159,7 +188,7 @@ function buildCoherentTheme(style: Record<string, string>) {
 const FIRECRAWL_API_KEY = process.env.FIRECRAWL_API_KEY;
 const FIRECRAWL_API_URL = "https://api.firecrawl.dev/v2/scrape";
 
-async function scrapeWithFirecrawl(url: string) {
+async function scrapeWithFirecrawl(url: string): Promise<FirecrawlData> {
   if (!FIRECRAWL_API_KEY) {
     throw new Error("FIRECRAWL_API_KEY not configured");
   }
@@ -182,11 +211,40 @@ async function scrapeWithFirecrawl(url: string) {
     throw new Error(`Firecrawl error ${res.status}: ${errText}`);
   }
 
-  const json = await res.json();
-  if (!json.success) {
+  const json = await res.json() as { success?: boolean; error?: string; data?: FirecrawlData };
+  if (!json.success || !json.data) {
     throw new Error(json.error || "Firecrawl scrape failed");
   }
   return json.data;
+}
+
+function extractBasicColors(html: string): Record<string, string | undefined> {
+  const hexColors = Array.from(html.matchAll(/#[0-9a-fA-F]{3,6}\b/g))
+    .map((match) => match[0])
+    .filter((color, index, all) => all.indexOf(color) === index);
+
+  const matchCssColor = (patterns: RegExp[]) => {
+    for (const pattern of patterns) {
+      const match = html.match(pattern);
+      if (match?.[1]) return match[1];
+    }
+    return undefined;
+  };
+
+  return {
+    primary: matchCssColor([
+      /--(?:brand|primary|accent)[\w-]*\s*:\s*(#[0-9a-fA-F]{3,6})/i,
+      /(?:brand|primary|accent)[\w-]*\s*:\s*(#[0-9a-fA-F]{3,6})/i,
+    ]) || hexColors[0],
+    background: matchCssColor([
+      /--(?:bg|background|surface)[\w-]*\s*:\s*(#[0-9a-fA-F]{3,6})/i,
+      /background(?:-color)?\s*:\s*(#[0-9a-fA-F]{3,6})/i,
+    ]) || hexColors[1],
+    textPrimary: matchCssColor([
+      /(?:^|[;{]\s*)color\s*:\s*(#[0-9a-fA-F]{3,6})/i,
+      /--(?:text|foreground)[\w-]*\s*:\s*(#[0-9a-fA-F]{3,6})/i,
+    ]),
+  };
 }
 
 export async function POST(request: NextRequest) {
@@ -209,7 +267,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 1. Scrape with Firecrawl
-    let firecrawlData: any;
+    let firecrawlData: FirecrawlData;
     try {
       firecrawlData = await scrapeWithFirecrawl(url);
       console.log("[Scrape] Firecrawl branding:", JSON.stringify(firecrawlData.branding || {}, null, 2).slice(0, 800));
@@ -219,6 +277,9 @@ export async function POST(request: NextRequest) {
       const response = await fetch(url, {
         headers: { "User-Agent": "Mozilla/5.0" },
       });
+      if (!response.ok) {
+        throw new Error(`Fetch error ${response.status}`);
+      }
       const html = await response.text();
       const titleMatch = html.match(/<title[^>]*>(.*?)<\/title>/i);
       const metaDescMatch = html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i);
@@ -227,16 +288,16 @@ export async function POST(request: NextRequest) {
       const pMatches = Array.from(html.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi));
       const paragraphs = pMatches.map((m) => m[1].replace(/<[^>]+>/g, " ").trim()).filter((t) => t.length > 20).slice(0, 15);
 
-      firecrawlData = {
-        markdown: [
-          `Title: ${titleMatch ? titleMatch[1] : ""}`,
+	      firecrawlData = {
+	        markdown: [
+	          `Title: ${titleMatch ? titleMatch[1] : ""}`,
           `Description: ${metaDescMatch ? metaDescMatch[1] : ""}`,
           `Headings:\n${headings.join("\n")}`,
           `Paragraphs:\n${paragraphs.join("\n")}`,
-        ].join("\n\n"),
-        branding: null,
-        images: [],
-      };
+	        ].join("\n\n"),
+	        branding: { colors: extractBasicColors(html) },
+	        images: [],
+	      };
     }
 
     const markdown = firecrawlData.markdown || "";
@@ -268,9 +329,11 @@ export async function POST(request: NextRequest) {
     };
 
     // 2. Build rich prompt for OpenAI
-    const prompt = `Tu es un expert en configuration de chatbots conversationnels pour des entreprises locales (salons, restaurants, commerces, cabinets médicaux, etc.).
+    const prompt = `Tu es un expert en configuration de chatbots conversationnels pour n'importe quelle entreprise locale ou indépendante : restaurant, cabinet médical, coach, garage, agence, commerce, artisan, salon, association, école, service B2B, etc.
 
 À partir du contenu du site web ci-dessous, génère une configuration JSON COMPLÈTE pour un chatbot conversationnel.
+
+Ne présume jamais que l'entreprise est un salon de coiffure. Déduis la niche réelle depuis le contenu du site. Si la prise de rendez-vous n'est pas pertinente, garde une aide au contact, à la demande de devis, à la réservation ou à la demande d'information selon le métier.
 
 CONTENU DU SITE (Markdown extrait) :
 ---
@@ -288,7 +351,7 @@ Génère UNIQUEMENT un objet JSON valide avec cette structure exacte (en frança
   "name": "Prénom du chatbot — invente un prénom original et approprié au type d'entreprise. Ne réutilise jamais systématiquement le même prénom.",
   "companyName": "Nom exact de l'entreprise",
   "tagline": "Slogan court et accrocheur (max 60 caractères)",
-  "welcomeMessage": "Message d'accueil chaleureux et personnalisé. 2-3 phrases max. Mentionne le nom de l'entreprise et le nom du chatbot. Invite à prendre rendez-vous ou poser une question.",
+	  "welcomeMessage": "Message d'accueil chaleureux et personnalisé. 2-3 phrases max. Mentionne le nom de l'entreprise et le nom du chatbot. Invite à l'action la plus pertinente pour cette niche : rendez-vous, réservation, devis, commande, contact ou question.",
   "inputPlaceholder": "Écrivez votre message...",
   "hours": "Horaires résumés (ex: Mar-Ven 9h-18h, Sam 9h-16h)",
   "address": "Adresse complète",
@@ -305,7 +368,7 @@ Génère UNIQUEMENT un objet JSON valide avec cette structure exacte (en frança
     { "id": "booking", "label": "Prendre rendez-vous", "action": "start_booking", "payload": {} },
     { "id": "hours", "label": "Horaires & adresse", "action": "show_info", "payload": {} }
   ],
-  "systemPrompt": "Prompt système COMPLET et DÉTAILLÉ. Doit suivre EXACTEMENT cette structure :\n\nTu es [NOM], l'assistante digitale de [ENTREPRISE].\n\nTon rôle :\n- Accueillir les clients avec chaleur et professionnalisme\n- Répondre aux questions sur les services, les tarifs, les horaires\n- Aider à prendre rendez-vous en collectant les informations nécessaires\n- Orienter vers un contact humain si besoin\n\nRègles STRICTES :\n- Sois concise, élégante, chaleureuse. Maximum 2-3 phrases par message.\n- Utilise un ton raffiné mais accessible.\n- Réponds en français.\n- Propose toujours des actions concrètes.\n- Pour les rendez-vous : collecte service → date → prénom → téléphone → créneau.\n- Quand tu proposes des créneaux, affiche UNIQUEMENT les créneaux DISPONIBLES. Ne mentionne JAMAIS les créneaux non disponibles ou occupés.\n- Si aucun créneau n'est disponible, dis simplement qu'il n'y a plus de place et propose une autre date.\n- Ne pose jamais deux questions en même message. Une question à la fois.\n- Pas de markdown, pas de listes numérotées, pas de texte en gras.\n\nServices principaux :\n[Liste des services avec prix]\n\nHoraires : [horaires]\nAdresse : [adresse]\nTéléphone : [contact]\n\nTu as accès à des outils pour vérifier les disponibilités et créer des rendez-vous.",
+	  "systemPrompt": "Prompt système COMPLET et DÉTAILLÉ. Doit suivre cette structure en l'adaptant à la niche réelle :\n\nTu es [NOM], l'assistant(e) digital(e) de [ENTREPRISE].\n\nTon rôle :\n- Accueillir les visiteurs avec chaleur et professionnalisme\n- Répondre aux questions sur les offres, services, produits, tarifs, horaires ou conditions\n- Guider vers l'action pertinente : rendez-vous, réservation, devis, commande, prise de contact ou demande d'information\n- Collecter uniquement les informations nécessaires pour cette action\n- Orienter vers un contact humain si besoin\n\nRègles STRICTES :\n- Sois concise, chaleureuse et professionnelle. Maximum 2-3 phrases par message.\n- Réponds en français.\n- Propose toujours des actions concrètes adaptées à l'entreprise.\n- Pour les rendez-vous ou réservations : vérifie les disponibilités avant de confirmer quoi que ce soit.\n- Ne promets jamais un créneau, une disponibilité, un prix ou une condition qui n'apparaît pas dans les données ou les outils.\n- Ne pose jamais deux questions en même message. Une question à la fois.\n- Pas de markdown, pas de listes numérotées, pas de texte en gras.\n\nOffres principales :\n[Liste des offres/services/produits avec prix si disponibles]\n\nHoraires : [horaires]\nAdresse : [adresse]\nContact : [contact]\n\nTu as accès à des outils pour répondre avec les informations configurées et, si pertinent, vérifier les disponibilités et créer une réservation.",
   "logoUrl": "${logoUrl || ""}",
   "style": {
     "primaryColor": "Couleur principale/brand du site (ex: #a0886d). Si le site est sombre, cette couleur sera utilisée comme accent sur un fond clair.",
@@ -324,8 +387,8 @@ Génère UNIQUEMENT un objet JSON valide avec cette structure exacte (en frança
 }
 
 RÈGLES IMPORTANTES :
-1. Le systemPrompt DOIT être long, détaillé, et suivre EXACTEMENT la structure ci-dessus avec toutes les sections (Ton rôle, Règles STRICTES, Services principaux, Horaires, Adresse, Téléphone).
-2. Génère au moins 4 services réels trouvés sur le site. Si aucun prix n'est visible, mets "Sur devis".
+1. Le systemPrompt DOIT être long, détaillé, et suivre la structure ci-dessus avec toutes les sections. Adapte les mots "services", "produits", "offres", "réservation", "devis" ou "rendez-vous" à la niche réelle.
+2. Génère au moins 4 offres/services/produits réels trouvés sur le site. Si aucun prix n'est visible, mets "Sur devis".
 3. Génère au moins 4 FAQ pertinentes pour ce type d'entreprise.
 4. Les quickReplies DOIVENT être exactement les 4 fournies ci-dessus avec les mêmes id/action.
 5. COULEURS — Tu n'as besoin de générer QUE "primaryColor" et "widgetBgColor". Toutes les autres couleurs (texte, bulles, boutons, bordures) seront calculées automatiquement par le système pour garantir un thème lisible. Ne te préoccupe PAS de la cohérence des couleurs, le système s'en charge.
@@ -334,19 +397,24 @@ RÈGLES IMPORTANTES :
 8. Réponds UNIQUEMENT avec le JSON valide, sans markdown, sans explication.`;
 
     let completion;
-    try {
-      completion = await createChatCompletion({
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0.7,
-      });
-    } catch (modelError) {
-      console.warn("[Scrape] Primary model failed, falling back:", modelError);
-      try {
-        completion = await createChatCompletion({
-          messages: [{ role: "user", content: prompt }],
-          temperature: 0.7,
-          model: "gpt-4.1-nano-2025-04-14",
-        });
+	    try {
+	      completion = await createChatCompletion({
+	        messages: [{ role: "user", content: prompt }],
+	        temperature: 0.7,
+	        model: process.env.OPENAI_SCRAPE_MODEL || "gpt-4.1-nano-2025-04-14",
+	        maxTokens: 4000,
+	        responseFormat: { type: "json_object" },
+	      });
+	    } catch (modelError) {
+	      console.warn("[Scrape] Primary model failed, falling back:", modelError);
+	      try {
+	        completion = await createChatCompletion({
+	          messages: [{ role: "user", content: prompt }],
+	          temperature: 0.7,
+	          model: "gpt-4o-mini",
+	          maxTokens: 4000,
+	          responseFormat: { type: "json_object" },
+	        });
       } catch (fallbackErr) {
         console.error("[Scrape] Fallback model also failed:", fallbackErr);
         return NextResponse.json(
@@ -362,7 +430,7 @@ RÈGLES IMPORTANTES :
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     const jsonStr = jsonMatch ? jsonMatch[0] : raw;
 
-    let generated: any;
+    let generated: GeneratedScrapeConfig;
     try {
       generated = JSON.parse(jsonStr);
     } catch (parseErr) {

@@ -6,7 +6,7 @@
 "use client";
 
 import { useState } from "react";
-import { Save, Edit3, Check } from "lucide-react";
+import { Edit3, Check } from "lucide-react";
 
 interface SystemPromptSectionProps {
   prompt: string;

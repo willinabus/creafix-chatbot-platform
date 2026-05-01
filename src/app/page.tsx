@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Save, RotateCcw, ChevronLeft, Globe, Loader2 } from "lucide-react";
 import { UsageStatus } from "@/lib/usage";
 import { deepMerge } from "@/lib/utils";
@@ -21,6 +21,34 @@ import { PreviewSection } from "@/features/dashboard/components/PreviewSection";
 import { BotSelector } from "@/features/dashboard/components/BotSelector";
 import { defaultChatbotConfig } from "@/features/chatbot/config/chatbotConfig";
 
+interface Bot {
+  id: string;
+  name: string;
+  companyName: string;
+  status: "active" | "draft";
+  createdAt: string;
+}
+
+const FALLBACK_BOTS: Bot[] = [
+  {
+    id: "clarissa-v1",
+    name: "Clarissa",
+    companyName: "La Coiffure Clarissa",
+    status: "active",
+    createdAt: "2026-04-28",
+  },
+];
+
+async function fetchBotsList(): Promise<Bot[]> {
+  try {
+    const res = await fetch("/api/bots");
+    const data = await res.json() as { success?: boolean; data?: Bot[] };
+    return data.success && data.data && data.data.length > 0 ? data.data : FALLBACK_BOTS;
+  } catch {
+    return FALLBACK_BOTS;
+  }
+}
+
 export default function DashboardPage() {
   const [view, setView] = useState<"list" | "edit">("list");
   const [selectedBotId, setSelectedBotId] = useState<string | null>(null);
@@ -30,56 +58,35 @@ export default function DashboardPage() {
   const [saveMessage, setSaveMessage] = useState("");
   const [usage, setUsage] = useState<UsageStatus | null>(null);
 
-  // Demo bots list (will come from DB in V2)
-  interface Bot {
-    id: string;
-    name: string;
-    companyName: string;
-    status: "active" | "draft";
-    createdAt: string;
-  }
-
   const [bots, setBots] = useState<Bot[]>([]);
   const [isLoadingBots, setIsLoadingBots] = useState(true);
   const [importUrl, setImportUrl] = useState("");
   const [isImporting, setIsImporting] = useState(false);
 
-  const loadBots = async () => {
+  const loadBots = useCallback(async () => {
     setIsLoadingBots(true);
     try {
-      const res = await fetch("/api/bots");
-      const data = await res.json();
-      if (data.success && data.data.length > 0) {
-        setBots(data.data);
-      } else {
-        setBots([
-          {
-            id: "clarissa-v1",
-            name: "Clarissa",
-            companyName: "La Coiffure Clarissa",
-            status: "active",
-            createdAt: "2026-04-28",
-          },
-        ]);
-      }
-    } catch {
-      setBots([
-        {
-          id: "clarissa-v1",
-          name: "Clarissa",
-          companyName: "La Coiffure Clarissa",
-          status: "active",
-          createdAt: "2026-04-28",
-        },
-      ]);
+      setBots(await fetchBotsList());
     } finally {
       setIsLoadingBots(false);
     }
-  };
+  }, []);
 
   // Load bots list from DB on mount
   useEffect(() => {
-    loadBots();
+    let cancelled = false;
+
+    void fetchBotsList()
+      .then((nextBots) => {
+        if (!cancelled) setBots(nextBots);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingBots(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Load saved config when selecting a bot
@@ -262,11 +269,15 @@ export default function DashboardPage() {
       setConfig(updatedConfig);
 
       // Auto-save
-      await fetch("/api/config", {
+      const saveRes = await fetch("/api/config", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updatedConfig),
       });
+      const saveData = await saveRes.json() as { success?: boolean; error?: string };
+      if (!saveRes.ok || !saveData.success) {
+        throw new Error(saveData.error || "import généré mais sauvegarde impossible");
+      }
 
       await loadBots();
       setSaveMessage("Configuration importée et sauvegardée");
@@ -402,10 +413,13 @@ export default function DashboardPage() {
         <nav className="w-64 border-r border-[#E0E0E0] bg-white min-h-screen sticky top-0">
           <div className="p-6 border-b border-[#E0E0E0]">
             <div className="flex items-center gap-3">
-              <img
-                src="https://www.creafix.ch/wp-content/uploads/2024/02/cropped-logo-creafix-favicon-fond-noir-32x32.png"
-                alt="CreaFix"
-                className="w-6 h-6"
+              <span
+                role="img"
+                aria-label="CreaFix"
+                className="block w-6 h-6 bg-center bg-contain bg-no-repeat"
+                style={{
+                  backgroundImage: "url(https://www.creafix.ch/wp-content/uploads/2024/02/cropped-logo-creafix-favicon-fond-noir-32x32.png)",
+                }}
               />
               <span
                 style={{

@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
     };
 
     return NextResponse.json({ success: true, data: publicConfig });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { success: false, error: "Failed to load widget config" },
       { status: 500 }

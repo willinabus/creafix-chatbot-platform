@@ -41,7 +41,7 @@ export function CalendarSection({ botId }: CalendarSectionProps) {
       } else {
         setError(data.error || "Erreur lors de la génération du lien");
       }
-    } catch (e) {
+    } catch {
       setError("Erreur réseau — vérifiez votre connexion");
     }
   };
@@ -132,7 +132,7 @@ export function CalendarSection({ botId }: CalendarSectionProps) {
               marginBottom: "12px",
             }}
           >
-            Lien d'autorisation pour le client
+            Lien d&apos;autorisation pour le client
           </h3>
 
           {error && (
@@ -257,9 +257,9 @@ export function CalendarSection({ botId }: CalendarSectionProps) {
               paddingLeft: "16px",
             }}
           >
-            <li>Cliquez sur "Générer le lien"</li>
+            <li>Cliquez sur &quot;Générer le lien&quot;</li>
             <li>Copiez le lien et envoyez-le au client</li>
-            <li>Le client clique, se connecte à son compte Google, et autorise l'accès</li>
+            <li>Le client clique, se connecte à son compte Google, et autorise l&apos;accès</li>
             <li>Le calendrier est automatiquement connecté</li>
           </ol>
         </div>
@@ -277,7 +277,7 @@ export function CalendarSection({ botId }: CalendarSectionProps) {
               lineHeight: 1.6,
             }}
           >
-            <strong style={{ color: "#ef4444" }}>Erreur "Accès bloqué" ?</strong>
+            <strong style={{ color: "#ef4444" }}>Erreur &quot;Accès bloqué&quot; ?</strong>
           </p>
           <ul
             style={{

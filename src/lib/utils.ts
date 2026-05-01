@@ -6,21 +6,26 @@
  * Deep merge objects — skips null/undefined values from source.
  * Keeps destination values when source is null/undefined.
  */
-export function deepMerge<T extends Record<string, any>>(dest: T, source: Partial<T>): T {
-  const result: any = { ...dest };
-  for (const key of Object.keys(source)) {
-    const sVal = (source as any)[key];
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+export function deepMerge<T extends object>(dest: T, source: Partial<T>): T {
+  const result: Record<string, unknown> = { ...(dest as Record<string, unknown>) };
+  const sourceRecord = source as Record<string, unknown>;
+  for (const key of Object.keys(sourceRecord)) {
+    const sVal = sourceRecord[key];
     if (sVal === null || sVal === undefined) {
       continue; // keep destination value
     }
     const dVal = result[key];
-    if (typeof dVal === "object" && dVal !== null && !Array.isArray(dVal) && typeof sVal === "object" && !Array.isArray(sVal)) {
+    if (isPlainObject(dVal) && isPlainObject(sVal)) {
       result[key] = deepMerge(dVal, sVal);
     } else {
       result[key] = sVal;
     }
   }
-  return result;
+  return result as T;
 }
 
 export function cn(...classes: (string | undefined | null | false)[]): string {

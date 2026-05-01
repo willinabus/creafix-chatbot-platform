@@ -5,8 +5,6 @@
 
 "use client";
 
-import { useState } from "react";
-
 interface BrandingSectionProps {
   config: {
     companyName: string;
@@ -112,7 +110,7 @@ export function BrandingSection({ config, onChange }: BrandingSectionProps) {
                 marginTop: "4px",
               }}
             >
-              Pour l'instant, le logo est géré en dur dans le code
+              Pour l&apos;instant, le logo est géré en dur dans le code
             </p>
           </div>
         </FormField>

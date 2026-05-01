@@ -25,8 +25,6 @@ export function QuickReplies({ replies, onSelect, disabled, buttonColor, buttonR
   const radius = buttonRadius || "4px";
   const textColor = getContrastText(bg);
   const font = fontFamily || "'Space Mono', 'Courier New', monospace";
-  // Hover: slightly lighter or darker
-  const hoverBg = textColor === "#F5F3EE" ? "#2a2825" : "#e0ded9";
 
   return (
     <motion.div
@@ -62,12 +60,12 @@ export function QuickReplies({ replies, onSelect, disabled, buttonColor, buttonR
           }}
           onMouseEnter={(e) => {
             if (!disabled) {
-              e.currentTarget.style.background = hoverBg;
+              e.currentTarget.style.filter = "brightness(0.94)";
               e.currentTarget.style.transform = "translateY(-1px)";
             }
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.background = bg;
+            e.currentTarget.style.filter = "none";
             e.currentTarget.style.transform = "translateY(0)";
           }}
         >

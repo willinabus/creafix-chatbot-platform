@@ -28,10 +28,13 @@ export function DashboardNav({ activeSection, onSectionChange }: DashboardNavPro
     <nav className="w-64 border-r border-[#E0E0E0] bg-white min-h-screen sticky top-0">
       <div className="p-6 border-b border-[#E0E0E0]">
         <div className="flex items-center gap-3">
-          <img
-            src="https://www.creafix.ch/wp-content/uploads/2024/02/cropped-logo-creafix-favicon-fond-noir-32x32.png"
-            alt="CreaFix"
-            className="w-6 h-6"
+          <span
+            role="img"
+            aria-label="CreaFix"
+            className="block w-6 h-6 bg-center bg-contain bg-no-repeat"
+            style={{
+              backgroundImage: "url(https://www.creafix.ch/wp-content/uploads/2024/02/cropped-logo-creafix-favicon-fond-noir-32x32.png)",
+            }}
           />
           <span
             style={{

@@ -39,7 +39,7 @@ export interface ProcessMessageResult {
 function parseAiQuickReplies(content: string): { cleaned: string; quickReplies: QuickReply[] } {
   const lines = content.split("\n");
   const result: QuickReply[] = [];
-  let cleanedLines: string[] = [];
+  const cleanedLines: string[] = [];
 
   for (const line of lines) {
     const trimmed = line.trim();
@@ -60,6 +60,138 @@ function parseAiQuickReplies(content: string): { cleaned: string; quickReplies: 
   }
 
   return { cleaned: cleanedLines.join("\n").trim(), quickReplies: result };
+}
+
+function pad2(value: number): string {
+  return String(value).padStart(2, "0");
+}
+
+function getLocalDateKey(date: Date): string {
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+}
+
+function getAvailabilityKey(context: ConversationContext): string | undefined {
+  if (!context.service || !context.preferredDate) return undefined;
+  const parsed = parseAsZurichDate(context.preferredDate);
+  if (Number.isNaN(parsed.getTime())) {
+    return `${context.service}|${context.preferredDate}`;
+  }
+  return `${context.service}|${getLocalDateKey(parsed)}`;
+}
+
+function createAvailabilityKey(service: string | undefined, date: Date): string | undefined {
+  if (!service) return undefined;
+  return `${service}|${getLocalDateKey(date)}`;
+}
+
+function shouldCheckAvailability(context: ConversationContext): boolean {
+  const key = getAvailabilityKey(context);
+  return Boolean(
+    context.service &&
+    context.preferredDate &&
+    key &&
+    context.availabilityCheckedFor !== key
+  );
+}
+
+function formatSlotLabel(date: Date): string {
+  return `${date.getHours()}h${pad2(date.getMinutes())}`;
+}
+
+function formatSlotLine(date: Date): string {
+  const day = date.toLocaleDateString("fr-FR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
+  return `${day} à ${formatSlotLabel(date)}`;
+}
+
+function normalizeTimeLabel(value: string): string | null {
+  const match = value.trim().match(/^(\d{1,2})\s*(?:h|:)?\s*(\d{0,2})$/i);
+  if (!match) return null;
+  const hour = Number(match[1]);
+  const minute = Number(match[2] || "0");
+  if (Number.isNaN(hour) || Number.isNaN(minute)) return null;
+  return `${hour}:${pad2(minute)}`;
+}
+
+function createSyntheticToolCall(
+  name: string,
+  args: Record<string, unknown>
+): OpenAI.Chat.ChatCompletionMessageToolCall {
+  return {
+    id: `local-${name}-${Date.now()}`,
+    type: "function",
+    function: {
+      name,
+      arguments: JSON.stringify(args),
+    },
+  };
+}
+
+function applyToolResultToContext(
+  result: ToolResult,
+  context: ConversationContext,
+  fnName: string
+): ConversationContext {
+  if (fnName === "check_availability") {
+    const slots = result.availableSlots ?? [];
+    const normalizedChosenTime = context.preferredTime ? normalizeTimeLabel(context.preferredTime) : null;
+    const chosenSlotIsAvailable = Boolean(
+      normalizedChosenTime &&
+      slots.some((slot) => normalizeTimeLabel(slot) === normalizedChosenTime)
+    );
+    const nextContext = {
+      ...context,
+      service: result.checkedService || context.service,
+      preferredDate: chosenSlotIsAvailable
+        ? context.preferredDate
+        : result.checkedDate || context.preferredDate,
+      preferredTime: chosenSlotIsAvailable ? context.preferredTime : undefined,
+      availableSlots: slots,
+      availabilityCheckedFor: result.availabilityCheckedFor || getAvailabilityKey(context),
+    };
+
+    if (slots.length === 0) {
+      return { ...nextContext, step: "ask_date" };
+    }
+
+    if (chosenSlotIsAvailable) {
+      return { ...nextContext, step: recalcStep(nextContext) };
+    }
+
+    return {
+      ...nextContext,
+      step: slots.length > 0 ? "choose_slot" : "ask_date",
+    };
+  }
+
+  if (fnName === "book_appointment" && result.content.includes("Rendez-vous confirmé")) {
+    return {
+      ...context,
+      step: "booking_confirmed",
+      availableSlots: undefined,
+      availabilityCheckedFor: undefined,
+      appointmentConfirmed: true,
+    };
+  }
+
+  return context;
+}
+
+function buildAvailabilityResponse(result: ToolResult): string {
+  if (result.displayContent) return result.displayContent;
+
+  if (result.content.startsWith("Aucun créneau")) {
+    return "Je n'ai pas trouvé de créneau disponible pour cette date. Quelle autre date vous conviendrait ?";
+  }
+
+  if (result.content.startsWith("Erreur")) {
+    return "Désolée, je n'arrive pas à vérifier les disponibilités pour le moment. Pouvez-vous réessayer dans un instant ?";
+  }
+
+  return cleanMarkdown(result.content);
 }
 
 export async function processMessage(
@@ -111,27 +243,53 @@ export async function processMessage(
   }
 
   // Update context based on user input (simple NLP)
-  let updatedContext = updateContext(userMessage, context);
+  const updatedContext = updateContext(userMessage, context);
+
+  let assistantContent: string;
+  let quickReplies: QuickReply[] | undefined;
+  const toolResults: ToolResult[] = [];
+  let contextAfterTools = updatedContext;
+
+  if (shouldCheckAvailability(updatedContext)) {
+    const result = await executeTool(
+      createSyntheticToolCall("check_availability", {
+        date: updatedContext.preferredDate,
+        service: updatedContext.service,
+      }),
+      updatedContext,
+      config.calendarProvider,
+      config.calendarConfig,
+      config
+    );
+
+    contextAfterTools = applyToolResultToContext(result, contextAfterTools, "check_availability");
+    assistantContent =
+      contextAfterTools.step === "choose_slot" || contextAfterTools.step === "ask_date"
+        ? buildAvailabilityResponse(result)
+        : generateLocalResponse(userMessage, contextAfterTools, config);
+    quickReplies = getQuickRepliesForState(contextAfterTools);
+
+    return {
+      message: {
+        id: `msg-${Date.now()}`,
+        role: "assistant",
+        content: assistantContent,
+        timestamp: new Date().toISOString(),
+        quickReplies,
+      },
+      context: contextAfterTools,
+    };
+  }
 
   // Build messages for OpenAI
   const messages = buildMessages(config.systemPrompt, history, userMessage, updatedContext);
 
-  let assistantContent: string;
-  let quickReplies: QuickReply[] | undefined;
-  let toolResults: ToolResult[] = [];
-  let contextAfterTools = updatedContext;
-
   if (isOpenAIConfigured()) {
     try {
-      // Force check_availability when we have service + date but haven't checked slots yet
-      const mustCheckSlots = updatedContext.service && updatedContext.preferredDate && !updatedContext.availableSlots;
-
       const completion = await createChatCompletion({
         messages,
-        tools: getToolDefinitions(updatedContext),
-        toolChoice: mustCheckSlots
-          ? { type: "function", function: { name: "check_availability" } }
-          : "auto",
+        tools: getToolDefinitions(),
+        toolChoice: "auto",
       });
 
       const choice = completion.choices[0];
@@ -146,15 +304,7 @@ export async function processMessage(
           const result = await executeTool(toolCall, contextAfterTools, config.calendarProvider, config.calendarConfig, config);
           toolResults.push(result);
           const fnName = (toolCall as { function: { name: string } }).function.name;
-          if (fnName === "check_availability" && !result.content.startsWith("Aucun créneau") && !result.content.startsWith("Erreur")) {
-            // Parse available slots from tool result to show as quick replies
-            const slotMatches = result.content.match(/•\s*(\d{1,2}h\d{0,2})/g);
-            const slots = slotMatches ? slotMatches.map((s: string) => s.replace("•", "").trim()) : [];
-            contextAfterTools = { ...contextAfterTools, step: "choose_slot", availableSlots: slots };
-          }
-          if (fnName === "book_appointment" && result.content.includes("Rendez-vous confirmé")) {
-            contextAfterTools = { ...contextAfterTools, step: "booking_confirmed", availableSlots: undefined };
-          }
+          contextAfterTools = applyToolResultToContext(result, contextAfterTools, fnName);
         }
 
         // Send tool results back to OpenAI for final response
@@ -191,8 +341,8 @@ export async function processMessage(
       }
     } catch (error) {
       console.error("[ChatEngine] OpenAI error:", error);
-      assistantContent = generateLocalResponse(userMessage, updatedContext, config);
-      quickReplies = getQuickRepliesForState(updatedContext);
+      assistantContent = generateLocalResponse(userMessage, contextAfterTools, config);
+      quickReplies = getQuickRepliesForState(contextAfterTools);
     }
   } else {
     assistantContent = generateLocalResponse(userMessage, updatedContext, config);
@@ -286,6 +436,9 @@ function buildMessages(
       : formatDateForAI(context.preferredDate);
     contextLines.push(`Date préférée : ${dateLabel}`);
   }
+  if (context.availableSlots && context.availableSlots.length > 0) {
+    contextLines.push(`Créneaux disponibles déjà montrés : ${context.availableSlots.join(", ")}`);
+  }
   if (context.step) contextLines.push(`Étape actuelle : ${context.step}`);
 
   const contextBlock = `\n\nINFORMATIONS DÉJÀ COLLECTÉES (ne pas redemander) :\n${contextLines.join("\n")}`;
@@ -332,7 +485,14 @@ Si aucun bouton n'est pertinent, n'ajoute PAS cette ligne.`;
 
   // Add last 10 messages for context
   const recentHistory = history.slice(-10);
-  for (const msg of recentHistory) {
+  for (let i = 0; i < recentHistory.length; i++) {
+    const msg = recentHistory[i];
+    const isDuplicateCurrentUser =
+      i === recentHistory.length - 1 &&
+      msg.role === "user" &&
+      msg.content.trim() === userMessage.trim();
+    if (isDuplicateCurrentUser) continue;
+
     if (msg.role === "user" || msg.role === "assistant") {
       messages.push({
         role: msg.role,
@@ -345,14 +505,14 @@ Si aucun bouton n'est pertinent, n'ajoute PAS cette ligne.`;
   return messages;
 }
 
-function getToolDefinitions(_context: ConversationContext): OpenAI.Chat.ChatCompletionTool[] {
+function getToolDefinitions(): OpenAI.Chat.ChatCompletionTool[] {
   const tools: OpenAI.Chat.ChatCompletionTool[] = [
     {
       type: "function",
       function: {
         name: "get_services",
         description: "Obtenir la liste des services et tarifs du salon",
-        parameters: { type: "object", properties: {}, additionalProperties: false },
+        parameters: { type: "object", properties: {}, required: [], additionalProperties: false },
         strict: true,
       },
     },
@@ -361,7 +521,7 @@ function getToolDefinitions(_context: ConversationContext): OpenAI.Chat.ChatComp
       function: {
         name: "get_hours",
         description: "Obtenir les horaires d'ouverture du salon",
-        parameters: { type: "object", properties: {}, additionalProperties: false },
+        parameters: { type: "object", properties: {}, required: [], additionalProperties: false },
         strict: true,
       },
     },
@@ -370,7 +530,7 @@ function getToolDefinitions(_context: ConversationContext): OpenAI.Chat.ChatComp
       function: {
         name: "get_address",
         description: "Obtenir l'adresse et le téléphone du salon",
-        parameters: { type: "object", properties: {}, additionalProperties: false },
+        parameters: { type: "object", properties: {}, required: [], additionalProperties: false },
         strict: true,
       },
     },
@@ -387,11 +547,11 @@ function getToolDefinitions(_context: ConversationContext): OpenAI.Chat.ChatComp
               description: "Date souhaitée au format ISO (YYYY-MM-DD) ou texte relatif comme 'demain', 'mardi prochain'",
             },
             service: {
-              type: "string",
+              type: ["string", "null"],
               description: "Service demandé (ex: Coupe femme, Coloration)",
             },
           },
-          required: ["date"],
+          required: ["date", "service"],
           additionalProperties: false,
         },
         strict: true,
@@ -412,7 +572,7 @@ function getToolDefinitions(_context: ConversationContext): OpenAI.Chat.ChatComp
             date: { type: "string", description: "Date et heure du rendez-vous (ISO). Ex: 2026-04-29T10:00:00.000Z" },
             notes: { type: ["string", "null"], description: "Notes éventuelles" },
           },
-          required: ["name", "phone", "service", "date"],
+          required: ["name", "phone", "email", "service", "date", "notes"],
           additionalProperties: false,
         },
         strict: true,
@@ -437,13 +597,30 @@ async function executeTool(
     case "check_availability": {
       const provider = await getCalendarProvider(calendarProviderConfig, calendarConfig);
       let dateStr = args.date as string;
+      const checkedService = (typeof args.service === "string" && args.service.trim())
+        ? args.service.trim()
+        : context.service;
       // Safeguard: if OpenAI passed a vague time-only string but we have a full preferredDate, use it
       if (context.preferredDate && (!dateStr || /^\d{1,2}h?$/i.test(dateStr))) {
         dateStr = context.preferredDate;
       }
       // Parse as Zurich local time to avoid UTC offset issues
       const targetDate = parseAsZurichDate(dateStr);
+      if (Number.isNaN(targetDate.getTime())) {
+        return {
+          toolCallId: toolCall.id,
+          role: "tool",
+          content: "Erreur lors de la vérification des disponibilités. Message: date invalide",
+          displayContent: "Je n'ai pas bien compris la date. Quelle date vous conviendrait ?",
+          availableSlots: [],
+          checkedService,
+        };
+      }
       targetDate.setHours(0, 0, 0, 0); // Normalize to midnight for clean slot generation
+      const checkedDateForContext = new Date(targetDate);
+      checkedDateForContext.setHours(12, 0, 0, 0);
+      const checkedDate = checkedDateForContext.toISOString();
+      const availabilityCheckedFor = createAvailabilityKey(checkedService, targetDate);
       const endDate = new Date(targetDate);
       endDate.setDate(endDate.getDate() + 7);
 
@@ -456,23 +633,40 @@ async function executeTool(
             toolCallId: toolCall.id,
             role: "tool",
             content: "Aucun créneau disponible pour cette période. Essayez une autre date.",
+            displayContent: "Je n'ai pas trouvé de créneau disponible pour cette date. Quelle autre date vous conviendrait ?",
+            availableSlots: [],
+            availabilityCheckedFor,
+            checkedDate,
+            checkedService,
           };
         }
 
+        const slotLabels = availableSlots.map((s) => formatSlotLabel(s.start));
         const slotsText = availableSlots
-          .map((s) => `${formatDateTime(s.start)}`)
+          .map((s) => `• ${formatSlotLine(s.start)}`)
           .join("\n");
+        const serviceText = checkedService ? ` pour une ${checkedService}` : "";
 
         return {
           toolCallId: toolCall.id,
           role: "tool",
-          content: `Voici les créneaux LIBRES (seulement ceux-ci sont disponibles, ne montre que ceux-là au client) :\n${slotsText}\n\nDemande au client de choisir un créneau précis parmi ceux-ci. Ne mentionne jamais les créneaux occupés.`,
+          content: `Voici les créneaux libres${serviceText} (seulement ceux-ci sont disponibles) :\n${slotsText}\n\nDemande au client de choisir un créneau précis parmi ceux-ci. Ne mentionne jamais les créneaux occupés.`,
+          displayContent: `Voici les créneaux disponibles${serviceText} :\n${slotsText}\n\nLequel vous convient ?`,
+          availableSlots: slotLabels,
+          availabilityCheckedFor,
+          checkedDate,
+          checkedService,
         };
       } catch (error) {
         return {
           toolCallId: toolCall.id,
           role: "tool",
           content: `Erreur lors de la vérification des disponibilités. Message: ${error instanceof Error ? error.message : "Erreur inconnue"}`,
+          displayContent: "Désolée, je n'arrive pas à vérifier les disponibilités pour le moment. Pouvez-vous réessayer dans un instant ?",
+          availableSlots: [],
+          availabilityCheckedFor,
+          checkedDate,
+          checkedService,
         };
       }
     }
@@ -483,10 +677,10 @@ async function executeTool(
         const event = await provider.createEvent({
           name: args.name as string,
           phone: args.phone as string,
-          email: args.email as string | undefined,
+          email: typeof args.email === "string" ? args.email : undefined,
           service: args.service as string,
           date: new Date(args.date as string),
-          notes: args.notes as string | undefined,
+          notes: typeof args.notes === "string" ? args.notes : undefined,
         });
 
         return {
@@ -547,7 +741,8 @@ async function executeTool(
   }
 }
 
-function recalcStep(ctx: ConversationContext): string {
+function recalcStep(ctx: ConversationContext): string | undefined {
+  if (ctx.intent !== "booking") return undefined;
   if (!ctx.service) return "ask_service";
   if (!ctx.preferredDate) return "ask_date";
   // If date is set but no slot chosen yet, stay in choose_slot
@@ -620,6 +815,7 @@ function parseFrenchDate(message: string): Date | null {
 function updateContext(message: string, context: ConversationContext): ConversationContext {
   const lowerMsg = message.toLowerCase();
   const updated = { ...context, collectedData: { ...context.collectedData } };
+  const previousAvailabilityKey = getAvailabilityKey(updated);
 
   // Detect intent
   if (
@@ -631,7 +827,7 @@ function updateContext(message: string, context: ConversationContext): Conversat
     lowerMsg.includes("créneau")
   ) {
     updated.intent = "booking";
-  } else if (lowerMsg.includes("service") || lowerMsg.includes("tarif") || lowerMsg.includes("prix")) {
+  } else if (lowerMsg.includes("service") || lowerMsg.includes("prestation") || lowerMsg.includes("tarif") || lowerMsg.includes("prix")) {
     updated.intent = "services";
   } else if (lowerMsg.includes("horaire") || lowerMsg.includes("ouvert")) {
     updated.intent = "hours";
@@ -651,8 +847,9 @@ function updateContext(message: string, context: ConversationContext): Conversat
       { regex: /chignon|coiffure\s+événementielle/i, value: "Coiffure événementielle" },
     ];
     for (const p of servicePatterns) {
-      if (p.regex.test(message) && !updated.service) {
+      if (p.regex.test(message)) {
         updated.service = p.value;
+        updated.intent = "booking";
         break;
       }
     }
@@ -665,6 +862,10 @@ function updateContext(message: string, context: ConversationContext): Conversat
     } else if (lowerMsg.includes("demain") || lowerMsg.includes("tomorrow")) {
       const d = new Date();
       d.setDate(d.getDate() + 1);
+      d.setHours(12, 0, 0, 0);
+      updated.preferredDate = d.toISOString();
+    } else if (lowerMsg.includes("cette semaine")) {
+      const d = new Date();
       d.setHours(12, 0, 0, 0);
       updated.preferredDate = d.toISOString();
     } else {
@@ -695,20 +896,38 @@ function updateContext(message: string, context: ConversationContext): Conversat
     if (timeMatch) {
       const hour = parseInt(timeMatch[1]);
       const minute = parseInt(timeMatch[2] || "0");
-      updated.preferredTime = `${hour}:${String(minute).padStart(2, "0")}`;
-      if (updated.preferredDate) {
+      const normalizedTime = `${hour}:${pad2(minute)}`;
+      const isKnownSlot =
+        !updated.availableSlots ||
+        updated.availableSlots.length === 0 ||
+        updated.availableSlots.some((slot) => normalizeTimeLabel(slot) === normalizedTime);
+
+      if (updated.preferredDate && isKnownSlot) {
+        updated.preferredTime = normalizedTime;
         const date = new Date(updated.preferredDate);
         date.setHours(hour, minute, 0, 0);
         updated.preferredDate = date.toISOString();
+      } else if (!isKnownSlot) {
+        updated.preferredTime = undefined;
       }
     } else if (updated.preferredDate) {
       const standaloneTime = message.match(/^(\d{1,2})h?$/i);
       if (standaloneTime) {
         const hour = parseInt(standaloneTime[1]);
-        updated.preferredTime = `${hour}:00`;
-        const date = new Date(updated.preferredDate);
-        date.setHours(hour, 0, 0, 0);
-        updated.preferredDate = date.toISOString();
+        const normalizedTime = `${hour}:00`;
+        const isKnownSlot =
+          !updated.availableSlots ||
+          updated.availableSlots.length === 0 ||
+          updated.availableSlots.some((slot) => normalizeTimeLabel(slot) === normalizedTime);
+
+        if (isKnownSlot) {
+          updated.preferredTime = normalizedTime;
+          const date = new Date(updated.preferredDate);
+          date.setHours(hour, 0, 0, 0);
+          updated.preferredDate = date.toISOString();
+        } else {
+          updated.preferredTime = undefined;
+        }
       }
     }
 
@@ -760,6 +979,12 @@ function updateContext(message: string, context: ConversationContext): Conversat
         }
       }
     }
+  }
+
+  const nextAvailabilityKey = getAvailabilityKey(updated);
+  if (previousAvailabilityKey !== nextAvailabilityKey) {
+    updated.availableSlots = undefined;
+    updated.availabilityCheckedFor = undefined;
   }
 
   // Recalculate step dynamically based on what we have
@@ -878,7 +1103,7 @@ function generateLocalResponse(
   }
 
   // Services
-  if (lowerMsg.includes("service") || lowerMsg.includes("tarif") || lowerMsg.includes("prix")) {
+  if (lowerMsg.includes("service") || lowerMsg.includes("prestation") || lowerMsg.includes("tarif") || lowerMsg.includes("prix")) {
     return `Voici nos services principaux :\n\n${config.content.services
       .map((s) => `• ${s.name} — ${s.description} (${s.price || "Sur devis"})`)
       .join("\n")}\n\nSouhaitez-vous prendre rendez-vous ?`;
@@ -907,33 +1132,27 @@ function generateLocalResponse(
     if (!context.preferredDate) {
       return `Parfait, une ${context.service}. Quelle date vous conviendrait ?`;
     }
+    if (!context.preferredTime) {
+      if (context.availableSlots && context.availableSlots.length > 0) {
+        const slots = context.availableSlots.map((slot) => `• ${slot}`).join("\n");
+        return `Voici les créneaux disponibles pour une ${context.service} :\n${slots}\n\nLequel vous convient ?`;
+      }
+
+      if (context.availabilityCheckedFor) {
+        return `Je n'ai pas trouvé de créneau disponible pour cette date. Quelle autre date vous conviendrait ?`;
+      }
+
+      return `Je vérifie les disponibilités pour une ${context.service}...`;
+    }
     if (!context.name) {
       return `Très bien. Pourriez-vous me donner votre prénom ?`;
     }
     if (!context.phone) {
       return `Merci ${context.name}. Un numéro de téléphone pour confirmer le rendez-vous ?`;
     }
-    return `Je vérifie les disponibilités pour une ${context.service}...`;
+    return `J'ai tout ce qu'il faut. Je confirme le rendez-vous.`;
   }
 
   // Default fallback
   return `Je comprends. Pour mieux vous aider, voici ce que je peux faire :\n\n• Répondre à vos questions\n• Vous présenter nos services\n• Vérifier nos disponibilités\n• Prendre un rendez-vous\n\nQue préférez-vous ?`;
-}
-
-function parseDateString(dateStr: string): Date {
-  const now = new Date();
-  const lower = dateStr.toLowerCase().trim();
-
-  if (lower === "aujourd'hui" || lower === "today") return now;
-  if (lower === "demain" || lower === "tomorrow") {
-    const d = new Date(now);
-    d.setDate(d.getDate() + 1);
-    return d;
-  }
-
-  // Try ISO parse
-  const iso = new Date(dateStr);
-  if (!isNaN(iso.getTime())) return iso;
-
-  return now;
 }

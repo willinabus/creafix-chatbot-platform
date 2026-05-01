@@ -11,15 +11,21 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const botId = searchParams.get("botId") || "clarissa-v1";
 
-  const dbConfig = await prisma.chatbotConfig.findUnique({
-    where: { id: botId },
-    select: { calendarConfig: true },
-  });
+  let calendarConfig: Record<string, unknown> = {};
+  try {
+    const dbConfig = await prisma.chatbotConfig.findUnique({
+      where: { id: botId },
+      select: { calendarConfig: true },
+    });
 
-  const calendarConfig = dbConfig?.calendarConfig
-    ? JSON.parse(dbConfig.calendarConfig)
-    : {};
-  const hasDynamicGoogleToken = !!calendarConfig?.googleRefreshToken;
+    calendarConfig = dbConfig?.calendarConfig
+      ? JSON.parse(dbConfig.calendarConfig) as Record<string, unknown>
+      : {};
+  } catch (error) {
+    console.error("[API /status] DB error:", error);
+  }
+
+  const hasDynamicGoogleToken = !!calendarConfig.googleRefreshToken;
 
   const googleConfigured = !!(
     process.env.GOOGLE_CLIENT_ID &&

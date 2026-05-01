@@ -5,6 +5,7 @@
 
 import { useState, FormEvent, KeyboardEvent } from "react";
 import { Send } from "lucide-react";
+import { getContrastText } from "@/lib/colors";
 
 interface ChatInputProps {
   onSend: (message: string) => void;
@@ -14,9 +15,25 @@ interface ChatInputProps {
   primaryColor?: string;
   accentColor?: string;
   fontFamily?: string;
+  surfaceColor?: string;
+  textColor?: string;
+  borderColor?: string;
+  buttonRadius?: string;
 }
 
-export function ChatInput({ onSend, disabled, placeholder = "Écrivez votre message...", buttonColor, primaryColor, accentColor, fontFamily }: ChatInputProps) {
+export function ChatInput({
+  onSend,
+  disabled,
+  placeholder = "Écrivez votre message...",
+  buttonColor,
+  primaryColor,
+  accentColor,
+  fontFamily,
+  surfaceColor,
+  textColor,
+  borderColor,
+  buttonRadius,
+}: ChatInputProps) {
   const [value, setValue] = useState("");
 
   const handleSubmit = (e: FormEvent) => {
@@ -35,14 +52,16 @@ export function ChatInput({ onSend, disabled, placeholder = "Écrivez votre mess
 
   const bg = buttonColor || primaryColor || "#0c0b09";
   const activeBg = accentColor || primaryColor || bg;
+  const sendIconColor = getContrastText(bg);
+  const inputTextColor = textColor || "#111111";
 
   return (
     <form
       onSubmit={handleSubmit}
       className="flex items-end gap-2 px-4 py-3"
       style={{
-        borderTop: "1px solid rgba(17,17,17,0.08)",
-        background: "#FCFBF8",
+        borderTop: `1px solid ${borderColor || "rgba(17,17,17,0.08)"}`,
+        background: surfaceColor || "#FCFBF8",
       }}
     >
       <textarea
@@ -57,7 +76,7 @@ export function ChatInput({ onSend, disabled, placeholder = "Écrivez votre mess
           fontFamily: fontFamily || "Georgia, 'Times New Roman', serif",
           fontSize: "15px",
           lineHeight: 1.5,
-          color: "#111111",
+          color: inputTextColor,
           padding: "8px 0",
           minHeight: "24px",
           maxHeight: "80px",
@@ -72,7 +91,7 @@ export function ChatInput({ onSend, disabled, placeholder = "Écrivez votre mess
           height: "36px",
           background: disabled || !value.trim() ? "rgba(17,17,17,0.06)" : bg,
           border: "none",
-          borderRadius: "4px",
+          borderRadius: buttonRadius || "4px",
           cursor: disabled || !value.trim() ? "not-allowed" : "pointer",
           transition: "all 0.15s ease",
           flexShrink: 0,
@@ -88,7 +107,7 @@ export function ChatInput({ onSend, disabled, placeholder = "Écrivez votre mess
       >
         <Send
           size={16}
-          color={disabled || !value.trim() ? "rgba(17,17,17,0.25)" : "#F5F3EE"}
+          color={disabled || !value.trim() ? "rgba(17,17,17,0.25)" : sendIconColor}
         />
       </button>
     </form>

@@ -236,7 +236,7 @@ export function BotSelector({ bots, onSelectBot, onDuplicateBot, onDeleteBot, on
         ))}
       </div>
 
-      {bots.length === 0 && (
+      {!isLoading && bots.length === 0 && (
         <div
           className="border border-dashed border-[#E0E0E0] p-12 text-center"
           style={{ borderRadius: "2px" }}

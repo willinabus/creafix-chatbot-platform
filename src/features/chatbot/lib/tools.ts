@@ -14,6 +14,8 @@ export async function getCalendarProvider(
   calendarConfig?: Record<string, unknown>
 ): Promise<CalendarProvider> {
   const cacheKey = JSON.stringify({ preferredProvider, calendarConfig });
+  const cachedProvider = providerCache.get(cacheKey);
+  if (cachedProvider) return cachedProvider;
 
   // Per-bot refresh token from DB config
   const refreshToken = calendarConfig?.googleRefreshToken as string | undefined;
@@ -22,6 +24,7 @@ export async function getCalendarProvider(
     const googleProvider = new GoogleMcpCalendarProvider(refreshToken);
     if (googleProvider.isConfigured) {
       console.log("[Calendar] Using bot-specific Google MCP Provider");
+      providerCache.set(cacheKey, googleProvider);
       return googleProvider;
     }
   }
@@ -31,13 +34,16 @@ export async function getCalendarProvider(
     const googleProvider = new GoogleMcpCalendarProvider();
     if (googleProvider.isConfigured) {
       console.log("[Calendar] Using env-based Google MCP Provider");
+      providerCache.set(cacheKey, googleProvider);
       return googleProvider;
     }
   }
 
   // Fallback: Mock
   console.log("[Calendar] Using Mock Provider (demo mode)");
-  return new MockCalendarProvider();
+  const mockProvider = new MockCalendarProvider();
+  providerCache.set(cacheKey, mockProvider);
+  return mockProvider;
 }
 
 export function resetCalendarProvider(): void {

@@ -20,7 +20,6 @@ interface ChatPreviewProps {
 export function ChatPreview({ config: propConfig }: ChatPreviewProps) {
   const config = propConfig || defaultChatbotConfig;
   const [messages, setMessages] = useState<Message[]>([]);
-  const [inputValue, setInputValue] = useState("");
 
   // Show welcome message on mount
   useEffect(() => {
@@ -111,7 +110,6 @@ export function ChatPreview({ config: propConfig }: ChatPreviewProps) {
       quickReplies: config.content.quickReplies,
     };
     setMessages((prev) => [...prev, userMsg, botMsg]);
-    setInputValue("");
   };
 
   return (
@@ -167,6 +165,10 @@ export function ChatPreview({ config: propConfig }: ChatPreviewProps) {
         primaryColor={config.style.primaryColor}
         accentColor={config.style.accentColor}
         fontFamily={config.style.fontFamily}
+        surfaceColor={config.style.widgetBgColor}
+        textColor={config.style.textColor}
+        borderColor={config.style.borderColor}
+        buttonRadius={config.style.buttonRadius}
       />
     </div>
   );

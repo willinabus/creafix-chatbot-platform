@@ -33,6 +33,11 @@ export interface ToolResult {
   toolCallId: string;
   role: "tool";
   content: string;
+  displayContent?: string;
+  availableSlots?: string[];
+  availabilityCheckedFor?: string;
+  checkedDate?: string;
+  checkedService?: string;
 }
 
 export interface ConversationState {
@@ -53,6 +58,7 @@ export interface ConversationContext {
   email?: string;
   appointmentConfirmed?: boolean;
   availableSlots?: string[];
+  availabilityCheckedFor?: string;
 }
 
 export interface ChatbotBranding {

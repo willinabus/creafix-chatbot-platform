@@ -29,7 +29,13 @@ export async function POST(request: NextRequest) {
 
     // Check quota (skip for welcome trigger)
     if (message !== "__WELCOME__") {
-      const quotaExceeded = await isQuotaExceeded(resolvedBotId);
+      let quotaExceeded = false;
+      try {
+        quotaExceeded = await isQuotaExceeded(resolvedBotId);
+      } catch (usageError) {
+        console.error("[API /chat] Usage quota check error:", usageError);
+      }
+
       if (quotaExceeded) {
         return NextResponse.json({
           success: true,

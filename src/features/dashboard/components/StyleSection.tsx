@@ -31,6 +31,23 @@ const FONT_OPTIONS = [
   { value: "'Courier New', monospace", label: "Courier (monospace)" },
 ];
 
+function toColorInputValue(value: string): string {
+  const trimmed = value.trim();
+  if (/^#[0-9a-f]{6}$/i.test(trimmed)) return trimmed;
+  if (/^#[0-9a-f]{3}$/i.test(trimmed)) {
+    return `#${trimmed.slice(1).split("").map((char) => char + char).join("")}`;
+  }
+
+  const rgbMatch = trimmed.match(/rgba?\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+  if (rgbMatch) {
+    return `#${[rgbMatch[1], rgbMatch[2], rgbMatch[3]]
+      .map((part) => Math.max(0, Math.min(255, Number(part))).toString(16).padStart(2, "0"))
+      .join("")}`;
+  }
+
+  return "#000000";
+}
+
 export function StyleSection({ style, branding, onChange }: StyleSectionProps) {
   const colorFields = [
     { key: "primaryColor" as const, label: "Couleur principale", desc: "Thème global, accents visibles" },
@@ -70,9 +87,9 @@ export function StyleSection({ style, branding, onChange }: StyleSectionProps) {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-5 gap-8">
+      <div className="grid grid-cols-1 2xl:grid-cols-[minmax(0,1fr)_620px] gap-8">
         {/* Left column: controls */}
-        <div className="xl:col-span-3 space-y-10">
+        <div className="space-y-10">
           {/* Colors */}
           <div>
             <h3
@@ -117,7 +134,7 @@ export function StyleSection({ style, branding, onChange }: StyleSectionProps) {
                   <div className="flex items-center gap-3">
                     <input
                       type="color"
-                      value={style[field.key]}
+                      value={toColorInputValue(style[field.key])}
                       onChange={(e) =>
                         onChange({ [field.key]: e.target.value } as Partial<ChatbotStyle>)
                       }
@@ -266,9 +283,8 @@ export function StyleSection({ style, branding, onChange }: StyleSectionProps) {
         </div>
 
         {/* Right column: previews */}
-        <div className="xl:col-span-2 space-y-8">
+        <div className="space-y-8">
           <div className="lg:sticky lg:top-24 self-start space-y-6">
-            {/* Widget preview */}
             <div>
               <h3
                 style={{
@@ -280,47 +296,46 @@ export function StyleSection({ style, branding, onChange }: StyleSectionProps) {
                   letterSpacing: "0.04em",
                 }}
               >
-                Aperçu du widget
+                Aperçus
               </h3>
-              <div
-                className="border border-[#E0E0E0] p-4 flex justify-center"
-                style={{ borderRadius: "2px", background: "rgba(0,0,0,0.02)" }}
-              >
-                <ChatPreview
-                  config={{
-                    ...defaultChatbotConfig,
-                    style: { ...defaultChatbotConfig.style, ...style },
-                    branding: { ...defaultChatbotConfig.branding, ...branding },
-                  }}
-                />
-              </div>
-            </div>
+              <div className="flex flex-col xl:flex-row gap-4 items-stretch">
+                <div
+                  className="border border-[#E0E0E0] p-4 flex justify-center min-w-0"
+                  style={{ borderRadius: "2px", background: "rgba(0,0,0,0.02)" }}
+                >
+                  <ChatPreview
+                    config={{
+                      ...defaultChatbotConfig,
+                      style: { ...defaultChatbotConfig.style, ...style },
+                      branding: { ...defaultChatbotConfig.branding, ...branding },
+                    }}
+                  />
+                </div>
 
-            {/* FAB bubble preview */}
-            <div>
-              <h3
-                style={{
-                  fontFamily: "'Space Mono', monospace",
-                  fontSize: "14px",
-                  fontWeight: 700,
-                  marginBottom: "16px",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.04em",
-                }}
-              >
-                Aperçu de la bulle
-              </h3>
-              <div
-                className="border border-[#E0E0E0] p-4"
-                style={{ borderRadius: "2px", background: "rgba(0,0,0,0.02)", height: "120px" }}
-              >
-                <ChatFabPreview
-                  buttonColor={style.buttonColor}
-                  primaryColor={style.primaryColor}
-                  borderRadius={style.borderRadius}
-                  shadow={style.shadow}
-                  widgetPosition={style.widgetPosition}
-                />
+                <div
+                  className="border border-[#E0E0E0] p-4 xl:w-[128px] shrink-0"
+                  style={{ borderRadius: "2px", background: "rgba(0,0,0,0.02)", minHeight: "120px" }}
+                >
+                  <div
+                    style={{
+                      fontFamily: "'Space Mono', monospace",
+                      fontSize: "11px",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.04em",
+                      color: "rgba(0,0,0,0.52)",
+                      marginBottom: "12px",
+                    }}
+                  >
+                    Bulle
+                  </div>
+                  <ChatFabPreview
+                    buttonColor={style.buttonColor}
+                    primaryColor={style.primaryColor}
+                    borderRadius={style.borderRadius}
+                    shadow={style.shadow}
+                    widgetPosition={style.widgetPosition}
+                  />
+                </div>
               </div>
             </div>
           </div>

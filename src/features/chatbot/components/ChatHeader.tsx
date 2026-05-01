@@ -22,8 +22,8 @@ interface ChatHeaderProps {
 export function ChatHeader({ title, subtitle, onClose, onMinimize, headerColor, textColor, iconColor, buttonColor, primaryColor, fontFamily }: ChatHeaderProps) {
   const headerBg = headerColor || "#FCFBF8";
   const txtColor = textColor || "#111111";
-  const icnColor = iconColor || "rgba(17,17,17,0.42)";
-  const btnColor = buttonColor || "#0c0b09";
+  const icnColor = iconColor || primaryColor || "rgba(17,17,17,0.42)";
+  const btnColor = buttonColor || primaryColor || "#0c0b09";
   const avatarTextColor = getContrastText(btnColor);
   const font = fontFamily || "Georgia, 'Times New Roman', serif";
 

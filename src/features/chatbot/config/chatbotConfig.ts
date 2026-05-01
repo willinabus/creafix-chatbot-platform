@@ -5,6 +5,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { ChatbotConfig } from "@/features/chatbot/types";
+import type { ChatbotConfig as PrismaChatbotConfig } from "@prisma/client";
 
 export const DEFAULT_QUICK_REPLIES = [
   { id: "faq", label: "Poser une question", action: "show_faq", payload: {} },
@@ -75,7 +76,7 @@ OUTILS DISPONIBLES :
 - check_availability : verifier les vrais creneaux disponibles pour une date donnee. Utilise-le immediatement quand le client mentionne une date et un service.
 - book_appointment : creer le rendez-vous dans le calendrier. UNIQUEMENT quand le client a choisi un creneau precis et que tu as deja son prenom, telephone, service et date/heure exacte.`;
 
-function dbToConfig(db: any): ChatbotConfig {
+function dbToConfig(db: PrismaChatbotConfig): ChatbotConfig {
   return {
     id: db.id,
     branding: {
@@ -241,7 +242,9 @@ export async function duplicateChatbot(originalId: string, newName?: string) {
     const botName = newName || original.name;
     const botCompany = original.companyName;
     const newId = generateBotId(botName, botCompany);
-    const { id, createdAt, updatedAt, ...data } = original;
+    const data = Object.fromEntries(
+      Object.entries(original).filter(([key]) => !["id", "createdAt", "updatedAt"].includes(key))
+    );
 
     const newBot = await prisma.chatbotConfig.create({
       data: {

@@ -6,7 +6,7 @@
 export const APP_CONFIG = {
   name: "CreaFix Chatbot Platform",
   version: "1.0.0",
-  defaultModel: "gpt-4o-mini",
+  defaultModel: "gpt-5-nano-2025-08-07",
   defaultTemperature: 0.3,
   maxTokens: 1500,
 } as const;

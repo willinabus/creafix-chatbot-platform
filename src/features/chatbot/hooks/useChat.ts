@@ -64,7 +64,7 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
             setMessages([assistantMessage]);
             setContext(result.data.context);
           }
-        } catch (error) {
+        } catch {
           // Fallback welcome
           const fallbackWelcome: Message = {
             id: generateId(),
@@ -148,6 +148,13 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
         case "start_booking":
           newContext.intent = "booking";
           newContext.step = "ask_service";
+          delete newContext.service;
+          delete newContext.preferredDate;
+          delete newContext.preferredTime;
+          delete newContext.name;
+          delete newContext.phone;
+          delete newContext.availableSlots;
+          delete newContext.availabilityCheckedFor;
           break;
         case "show_services":
           newContext.intent = "services";
@@ -162,11 +169,18 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
           newContext.service = quickReply.payload?.service as string;
           newContext.intent = "booking";
           newContext.step = "ask_date";
+          delete newContext.preferredDate;
+          delete newContext.preferredTime;
+          delete newContext.availableSlots;
+          delete newContext.availabilityCheckedFor;
           break;
         case "set_date":
-          newContext.preferredDate = quickReply.payload?.date as string;
           newContext.intent = "booking";
-          newContext.step = "ask_name";
+          newContext.step = "ask_date";
+          delete newContext.preferredDate;
+          delete newContext.preferredTime;
+          delete newContext.availableSlots;
+          delete newContext.availabilityCheckedFor;
           break;
         case "send_text":
         default:
