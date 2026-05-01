@@ -64,7 +64,7 @@ export async function createChatCompletion(options: ChatCompletionOptions) {
   if (useReasoning) {
     // Chat Completions reasoning models use max_completion_tokens + reasoning_effort.
     body.max_completion_tokens = maxTokens;
-    body.reasoning_effort = options.reasoningEffort ?? "medium";
+    body.reasoning_effort = options.reasoningEffort ?? "low";
   } else {
     body.max_tokens = maxTokens;
     body.temperature = options.temperature ?? OPENAI_CONFIG.temperature;

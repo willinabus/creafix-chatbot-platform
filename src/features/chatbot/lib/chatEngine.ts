@@ -339,6 +339,12 @@ export async function processMessage(
       } else {
         quickReplies = getQuickRepliesForState(contextAfterTools);
       }
+
+      // Global fallback: if AI returned empty or whitespace-only, generate local response
+      if (!assistantContent.trim()) {
+        assistantContent = generateLocalResponse(userMessage, contextAfterTools, config);
+        quickReplies = getQuickRepliesForState(contextAfterTools);
+      }
     } catch (error) {
       console.error("[ChatEngine] OpenAI error:", error);
       assistantContent = generateLocalResponse(userMessage, contextAfterTools, config);
@@ -464,6 +470,11 @@ QUAND UTILISER LES OUTILS — RÈGLES OBLIGATOIRES :
 - Si check_availability retourne "Aucun créneau" → propose une autre date et appelle à nouveau check_availability.
 - Tu ne dois JAMAIS demander le prénom ou le téléphone AVANT d'avoir appelé check_availability et montré les créneaux disponibles au client.
 - Utilise book_appointment UNIQUEMENT quand le client a choisi un créneau précis ET que tu as déjà son prénom, son téléphone, le service et la date/heure exacte.
+
+PROGRESSION DU BOOKING (guide) :
+- Si le client vient de choisir un créneau parmi ceux déjà montrés → confirme le créneau et demande son prénom.
+- Si le prénom est connu mais pas le téléphone → demande le téléphone.
+- Si le téléphone est connu → appelle book_appointment pour confirmer.
 
 DÉFINITION DE "TERMINÉ" POUR UN RENDEZ-VOUS :
 Un rendez-vous est complètement réservé quand book_appointment a retourné une confirmation. Avant cela, si des informations manquent (service, date, créneau choisi, prénom, téléphone), le processus n'est PAS terminé. Guide le client calmement jusqu'à ce que tout soit collecté.
