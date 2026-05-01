@@ -295,6 +295,8 @@ INSTRUCTIONS SUPPLEMENTAIRES POUR CETTE RÉPONSE :
 - Si une information est déjà collectée (voir ci-dessus), passe à la suivante.
 - Guide progressivement l'utilisateur vers la prise de rendez-vous en collectant : service → date → prénom → téléphone → créneau.
 - "Demain" = le lendemain d'aujourd'hui. "Aujourd'hui" = ${todayStr}.
+- Quand l'utilisateur te donne une date (ex: "13 mai", "demain", "mardi"), tu DOIS appeler l'outil check_availability pour vérifier les créneaux. Ne commente JAMAIS si le salon est ouvert ou fermé — c'est l'outil qui le sait.
+- Si la date est un jour fermé, l'outil te le dira. Propose alors gentiment une autre date.
 - Quand l'outil check_availability te retourne des créneaux, affiche UNIQUEMENT ces créneaux au client. N'invente JAMAIS d'autres créneaux.
 - N'utilise JAMAIS l'heure "12h00" comme créneau proposé. La date à 12h00 est juste une référence, pas un créneau choisi.
 
@@ -562,6 +564,48 @@ function parseDayOfWeek(message: string): Date | null {
   return null;
 }
 
+const MONTH_NAMES: Record<string, number> = {
+  janvier: 0, fevrier: 1, fev: 1, february: 1,
+  mars: 2, mar: 2, march: 2,
+  avril: 3, avr: 3, april: 3,
+  mai: 4, may: 4,
+  juin: 5, jun: 5, june: 5,
+  juillet: 6, juil: 6, july: 6,
+  aout: 7, août: 7, aug: 7, august: 7,
+  septembre: 8, sep: 8, sept: 8, september: 8,
+  octobre: 9, oct: 9, october: 9,
+  novembre: 10, nov: 10, november: 10,
+  decembre: 11, dec: 11, december: 11,
+};
+
+function parseFrenchDate(message: string): Date | null {
+  const lower = message.toLowerCase();
+  // Match: "13 mai", "13 mai 2026", "le 13 mai", "le 13/05", "13-05"
+  const regex = /(?:le\s+)?(\d{1,2})[\/\-\s]+([a-zéû]+)(?:\s+(\d{4}))?/i;
+  const match = lower.match(regex);
+  if (!match) return null;
+
+  const day = parseInt(match[1]);
+  const monthStr = match[2].toLowerCase().trim();
+  const yearStr = match[3];
+
+  const month = MONTH_NAMES[monthStr];
+  if (month === undefined) return null;
+
+  const now = new Date();
+  let year = yearStr ? parseInt(yearStr) : now.getFullYear();
+
+  // If the date is in the past and no year specified, assume next year
+  const candidate = new Date(year, month, day);
+  if (!yearStr && candidate < now) {
+    year += 1;
+  }
+
+  const result = new Date(year, month, day);
+  result.setHours(12, 0, 0, 0);
+  return result;
+}
+
 function updateContext(message: string, context: ConversationContext): ConversationContext {
   const lowerMsg = message.toLowerCase();
   const updated = { ...context, collectedData: { ...context.collectedData } };
@@ -613,19 +657,24 @@ function updateContext(message: string, context: ConversationContext): Conversat
       d.setHours(12, 0, 0, 0);
       updated.preferredDate = d.toISOString();
     } else {
-      const dayMatch = parseDayOfWeek(message);
-      if (dayMatch) {
-        dayMatch.setHours(12, 0, 0, 0);
-        updated.preferredDate = dayMatch.toISOString();
+      const frenchDate = parseFrenchDate(message);
+      if (frenchDate) {
+        updated.preferredDate = frenchDate.toISOString();
       } else {
-        const dateMatch = message.match(/(\d{1,2})[\/\-](\d{1,2})/);
-        if (dateMatch) {
-          const day = parseInt(dateMatch[1]);
-          const month = parseInt(dateMatch[2]) - 1;
-          const now = new Date();
-          const d = new Date(now.getFullYear(), month, day);
-          d.setHours(12, 0, 0, 0);
-          updated.preferredDate = d.toISOString();
+        const dayMatch = parseDayOfWeek(message);
+        if (dayMatch) {
+          dayMatch.setHours(12, 0, 0, 0);
+          updated.preferredDate = dayMatch.toISOString();
+        } else {
+          const dateMatch = message.match(/(\d{1,2})[\/-](\d{1,2})/);
+          if (dateMatch) {
+            const day = parseInt(dateMatch[1]);
+            const month = parseInt(dateMatch[2]) - 1;
+            const now = new Date();
+            const d = new Date(now.getFullYear(), month, day);
+            d.setHours(12, 0, 0, 0);
+            updated.preferredDate = d.toISOString();
+          }
         }
       }
     }
