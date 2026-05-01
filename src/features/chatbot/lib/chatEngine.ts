@@ -32,6 +32,36 @@ export interface ProcessMessageResult {
   context: ConversationContext;
 }
 
+/**
+ * Parse QUICK_REPLIES: line from AI-generated message
+ * Returns extracted quick replies and cleaned content (line removed)
+ */
+function parseAiQuickReplies(content: string): { cleaned: string; quickReplies: QuickReply[] } {
+  const lines = content.split("\n");
+  const result: QuickReply[] = [];
+  let cleanedLines: string[] = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith("QUICK_REPLIES:")) {
+      const optionsPart = trimmed.replace("QUICK_REPLIES:", "").trim();
+      const options = optionsPart.split("|").map((o) => o.trim()).filter((o) => o.length > 0);
+      for (let i = 0; i < options.length; i++) {
+        result.push({
+          id: `ai-qr-${i}`,
+          label: options[i],
+          action: "send_text",
+          payload: {},
+        });
+      }
+    } else {
+      cleanedLines.push(line);
+    }
+  }
+
+  return { cleaned: cleanedLines.join("\n").trim(), quickReplies: result };
+}
+
 export async function processMessage(
   userMessage: string,
   context: ConversationContext,
@@ -145,7 +175,14 @@ export async function processMessage(
         assistantContent = cleanMarkdown(choice.message.content || "");
       }
 
-      quickReplies = getQuickRepliesForState(contextAfterTools);
+      // Parse AI-generated quick replies, fallback to state-based if none found
+      const parsed = parseAiQuickReplies(assistantContent);
+      if (parsed.quickReplies.length > 0) {
+        assistantContent = parsed.cleaned;
+        quickReplies = parsed.quickReplies;
+      } else {
+        quickReplies = getQuickRepliesForState(contextAfterTools);
+      }
     } catch (error) {
       console.error("[ChatEngine] OpenAI error:", error);
       assistantContent = generateLocalResponse(userMessage, updatedContext, config);
@@ -259,7 +296,18 @@ INSTRUCTIONS SUPPLEMENTAIRES POUR CETTE RÉPONSE :
 - Guide progressivement l'utilisateur vers la prise de rendez-vous en collectant : service → date → prénom → téléphone → créneau.
 - "Demain" = le lendemain d'aujourd'hui. "Aujourd'hui" = ${todayStr}.
 - Quand l'outil check_availability te retourne des créneaux, affiche UNIQUEMENT ces créneaux au client. N'invente JAMAIS d'autres créneaux.
-- N'utilise JAMAIS l'heure "12h00" comme créneau proposé. La date à 12h00 est juste une référence, pas un créneau choisi.`;
+- N'utilise JAMAIS l'heure "12h00" comme créneau proposé. La date à 12h00 est juste une référence, pas un créneau choisi.
+
+INSTRUCTION CRITIQUE — BOUTONS DE RÉPONSE :
+À la toute fin de ta réponse, sur une ligne séparée, ajoute exactement :
+QUICK_REPLIES: option1 | option2 | option3
+
+Les options doivent être des réponses courtes et pertinentes à ta question posée.
+Exemple si tu proposes des créneaux : QUICK_REPLIES: 9h00 | 10h30 | 14h00 | 15h30
+Exemple si tu demandes le service : QUICK_REPLIES: Coupe femme | Coupe homme | Coloration
+Exemple si tu demandes la date : QUICK_REPLIES: Aujourd'hui | Demain | Cette semaine
+Exemple à la fin du booking : QUICK_REPLIES: Nouveau rendez-vous | Voir les services
+Si aucun bouton n'est pertinent, n'ajoute PAS cette ligne.`;
 
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
     { role: "system", content: enrichedSystemPrompt },
