@@ -267,7 +267,7 @@ export async function processMessage(
       contextAfterTools.step === "choose_slot" || contextAfterTools.step === "ask_date"
         ? buildAvailabilityResponse(result)
         : generateLocalResponse(userMessage, contextAfterTools, config);
-    quickReplies = getQuickRepliesForState(contextAfterTools);
+    quickReplies = getQuickRepliesForState(contextAfterTools, config.content.services);
 
     return {
       message: {
@@ -337,22 +337,22 @@ export async function processMessage(
         assistantContent = parsed.cleaned;
         quickReplies = parsed.quickReplies;
       } else {
-        quickReplies = getQuickRepliesForState(contextAfterTools);
+        quickReplies = getQuickRepliesForState(contextAfterTools, config.content.services);
       }
 
       // Global fallback: if AI returned empty or whitespace-only, generate local response
       if (!assistantContent.trim()) {
         assistantContent = generateLocalResponse(userMessage, contextAfterTools, config);
-        quickReplies = getQuickRepliesForState(contextAfterTools);
+        quickReplies = getQuickRepliesForState(contextAfterTools, config.content.services);
       }
     } catch (error) {
       console.error("[ChatEngine] OpenAI error:", error);
       assistantContent = generateLocalResponse(userMessage, contextAfterTools, config);
-      quickReplies = getQuickRepliesForState(contextAfterTools);
+      quickReplies = getQuickRepliesForState(contextAfterTools, config.content.services);
     }
   } else {
     assistantContent = generateLocalResponse(userMessage, updatedContext, config);
-    quickReplies = getQuickRepliesForState(updatedContext);
+    quickReplies = getQuickRepliesForState(updatedContext, config.content.services);
   }
 
   return {
@@ -375,13 +375,12 @@ function getDirectResponse(
     case "Prendre rendez-vous":
       return {
         content: "Avec plaisir. Quelle prestation souhaitez-vous ?",
-        quickReplies: [
-          { id: "svc_cut_f", label: "Coupe femme", action: "set_service", payload: { service: "Coupe femme" } },
-          { id: "svc_cut_m", label: "Coupe homme", action: "set_service", payload: { service: "Coupe homme" } },
-          { id: "svc_color", label: "Coloration", action: "set_service", payload: { service: "Coloration" } },
-          { id: "svc_balay", label: "Balayage", action: "set_service", payload: { service: "Balayage" } },
-          { id: "svc_soin", label: "Soin", action: "set_service", payload: { service: "Soin profond" } },
-        ],
+        quickReplies: config.content.services.map((s, i) => ({
+          id: `svc_${i}`,
+          label: s.name,
+          action: "set_service",
+          payload: { service: s.name },
+        })),
       };
     case "Voir les services":
       return {
@@ -485,7 +484,7 @@ QUICK_REPLIES: option1 | option2 | option3
 
 Les options doivent être des réponses courtes et pertinentes à ta question posée.
 Exemple si tu proposes des créneaux : QUICK_REPLIES: 9h00 | 10h30 | 14h00 | 15h30
-Exemple si tu demandes le service : QUICK_REPLIES: Coupe femme | Coupe homme | Coloration
+Exemple si tu demandes le service : QUICK_REPLIES: Service 1 | Service 2 | Service 3
 Exemple si tu demandes la date : QUICK_REPLIES: Aujourd'hui | Demain | Cette semaine
 Exemple à la fin du booking : QUICK_REPLIES: Nouveau rendez-vous | Voir les services
 Si aucun bouton n'est pertinent, n'ajoute PAS cette ligne.`;
@@ -559,7 +558,7 @@ function getToolDefinitions(): OpenAI.Chat.ChatCompletionTool[] {
             },
             service: {
               type: ["string", "null"],
-              description: "Service demandé (ex: Coupe femme, Coloration)",
+              description: "Service demandé (ex: selon les services du salon)",
             },
           },
           required: ["date", "service"],
@@ -1004,7 +1003,10 @@ function updateContext(message: string, context: ConversationContext): Conversat
   return updated;
 }
 
-function getQuickRepliesForState(context: ConversationContext): QuickReply[] {
+function getQuickRepliesForState(
+  context: ConversationContext,
+  services?: Array<{ name: string }>
+): QuickReply[] {
   const intent = context.intent;
   const step = context.step;
 
@@ -1031,15 +1033,15 @@ function getQuickRepliesForState(context: ConversationContext): QuickReply[] {
     ];
   }
 
-  // Booking flow — choose service
+  // Booking flow — choose service (use bot's actual services)
   if (step === "ask_service" || (intent === "booking" && !context.service)) {
-    return [
-      { id: "svc_cut_f", label: "Coupe femme", action: "set_service", payload: { service: "Coupe femme" } },
-      { id: "svc_cut_m", label: "Coupe homme", action: "set_service", payload: { service: "Coupe homme" } },
-      { id: "svc_color", label: "Coloration", action: "set_service", payload: { service: "Coloration" } },
-      { id: "svc_balay", label: "Balayage", action: "set_service", payload: { service: "Balayage" } },
-      { id: "svc_soin", label: "Soin", action: "set_service", payload: { service: "Soin profond" } },
-    ];
+    const svcList = services && services.length > 0 ? services : defaultChatbotConfig.content.services;
+    return svcList.map((s, i) => ({
+      id: `svc_${i}`,
+      label: s.name,
+      action: "set_service",
+      payload: { service: s.name },
+    }));
   }
 
   // Booking flow — choose date
@@ -1122,12 +1124,12 @@ function generateLocalResponse(
 
   // Hours
   if (lowerMsg.includes("horaire") || lowerMsg.includes("ouvert")) {
-    return `Nos horaires :\n${config.content.hours}\n\nNous sommes fermés dimanche et lundi.`;
+    return `Nos horaires :\n${config.content.hours}`;
   }
 
   // Address
   if (lowerMsg.includes("adresse") || lowerMsg.includes("où") || lowerMsg.includes("trouve")) {
-    return `Nous sommes situés au :\n${config.content.address}\n\nÀ deux pas de la gare Cornavin.`;
+    return `Nous sommes situés au :\n${config.content.address}`;
   }
 
   // Contact
